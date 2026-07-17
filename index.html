@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nitro Service</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nitro Service">
+<meta name="theme-color" content="#1e3a8a">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+// ---------- Helpers ----------
+const uid = () => Math.random().toString(36).slice(2, 10);
+const today = () => new Date().toISOString().slice(0, 10);
+const fmt = (n) => (Math.round(n * 10) / 10).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtDate = (iso) => { if (!iso) return "–"; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; };
+const parseNum = (s) => { const v = parseFloat(String(s).replace(",", ".")); return isNaN(v) ? 0 : v; };
+
+const SPEC_FIELDS = [
+  ["gehaeuse", "Gehäuse"], ["buchse", "Buchse"], ["kolben", "Kolben"], ["welle", "Welle"],
+  ["vergaser", "Vergaser"], ["kopfspalt", "Kopfspalt"], ["venturi", "Venturi"],
+  ["kupplungsfeder", "Kupplungsfeder"], ["kupplungsvorspannung", "Kupplungsvorspannung"],
+  ["gap", "Gap"], ["kerze", "Kerze"], ["reso", "Reso"], ["kruemmer", "Krümmer"],
+];
+
+const seedData = () => ({
+  activeAutoId: null,
+  autos: [],
+  motoren: [],
+  fahrten: [],
+  settings: {
+    fv: { max: 12, gelb: 3 }, fg1: { max: 8, gelb: 2 },
+    hl: { max: 5, gelb: 1 }, fl: { max: 5, gelb: 1 }, pl: { max: 5, gelb: 1 },
+  },
+});
+
+// ---------- Calculations ----------
+const litersFor = (fahrten, field, id, resetDate) =>
+  fahrten.filter((f) => f[field] === id && (!resetDate || f.datum >= resetDate))
+    .reduce((s, f) => s + f.liter, 0);
+
+const partStand = (fahrten, field, id, part) => part.start + litersFor(fahrten, field, id, part.reset);
+
+const motorStands = (fahrten, m) => ({
+  gesamt: partStand(fahrten, "motorId", m.id, m.motor),
+  hl: partStand(fahrten, "motorId", m.id, m.hl),
+  fl: partStand(fahrten, "motorId", m.id, m.fl),
+  pl: partStand(fahrten, "motorId", m.id, m.pl),
+});
+
+const statusOf = (stand, cfg) => {
+  const rest = cfg.max - stand;
+  if (rest <= 0) return { key: "rot", label: "FÄLLIG", rest };
+  if (rest <= cfg.gelb) return { key: "gelb", label: "BALD FÄLLIG", rest };
+  return { key: "grün", label: "OK", rest };
+};
+
+const STATUS_STYLE = {
+  "grün": { chip: "bg-emerald-100 text-emerald-800", bar: "bg-emerald-500" },
+  "gelb": { chip: "bg-amber-100 text-amber-800", bar: "bg-amber-400" },
+  "rot": { chip: "bg-red-100 text-red-700", bar: "bg-red-500" },
+};
+
+// ---------- Small components (stabil, außerhalb von App) ----------
+function TankBar({ name, note, stand, cfg }) {
+  const st = statusOf(stand, cfg);
+  const pct = Math.max(0, Math.min(100, (st.rest / cfg.max) * 100));
+  const sty = STATUS_STYLE[st.key];
+  return (
+    <div className="py-1.5">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+          {name}{note ? <span className="normal-case tracking-normal font-bold text-slate-800"> · {note}</span> : null}
+        </span>
+        <span className="text-xs text-slate-500 tabular-nums">
+          {fmt(stand)} / {fmt(cfg.max)} L · <span className={`px-1.5 py-0.5 rounded-full font-bold ${sty.chip}`}>{st.label}</span>
+        </span>
+      </div>
+      <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+        <div className={`h-full rounded-full ${sty.bar}`} style={{ width: `${pct}%`, transition: "width .4s" }} />
+      </div>
+    </div>
+  );
+}
+
+function Card({ children, className = "" }) {
+  return <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 p-4 ${className}`}>{children}</div>;
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block mb-3">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputCls = "w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-800";
+
+function ConfirmButton({ label, confirmLabel, onConfirm, className }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button onClick={() => { if (armed) { setArmed(false); onConfirm(); } else { setArmed(true); } }}
+      className={`${className} ${armed ? "bg-red-600 text-white border-red-600" : ""}`}>
+      {armed ? confirmLabel : label}
+    </button>
+  );
+}
+
+function PartEditor({ title, part, onChange, withNote }) {
+  return (
+    <div className="border border-slate-200 rounded-xl p-3 mb-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-slate-800">{title}</span>
+        <button onClick={() => onChange({ ...part, reset: today(), start: 0 })}
+          className="text-xs font-bold text-blue-900 border border-blue-900 rounded-full px-3 py-1 active:bg-blue-50">Teil getauscht → 0</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-slate-500">Reset am
+          <input type="date" className={`${inputCls} mt-1`} value={part.reset} onChange={(e) => onChange({ ...part, reset: e.target.value })} />
+        </label>
+        <label className="text-xs font-bold text-slate-900">Startwert [L]
+          <input inputMode="decimal" className={`${inputCls} mt-1 font-bold`} defaultValue={String(part.start).replace(".", ",")}
+            key={`${part.reset}-${title}`}
+            onBlur={(e) => onChange({ ...part, start: parseNum(e.target.value) })} />
+        </label>
+      </div>
+      {withNote && (
+        <label className="block text-xs text-slate-500 mt-2">Notiz (z. B. Hersteller)
+          <input className={`${inputCls} mt-1`} placeholder="z. B. O.S Lager" value={part.note || ""}
+            onChange={(e) => onChange({ ...part, note: e.target.value })} />
+        </label>
+      )}
+    </div>
+  );
+}
+
+// ---------- Screens ----------
+function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAutoId, up }) {
+  const activeAuto = autos.find((a) => a.id === activeAutoId) || autos[0] || null;
+  const activeMotor = activeAuto ? motoren.find((m) => m.id === activeAuto.motorId) || null : null;
+  const shownAutos = activeAuto ? [activeAuto] : [];
+  const shownMotoren = activeMotor ? [activeMotor] : [];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-blue-900">Aktives Auto</h2>
+        {autos.length > 1 && (
+          <select className="rounded-xl border border-slate-300 px-2 py-1 text-sm bg-white" value={activeAuto?.id || ""}
+            onChange={(e) => up({ activeAutoId: e.target.value })}>
+            {autos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        )}
+      </div>
+      {autos.length === 0 && (
+        <Card className="text-sm text-slate-600">
+          Noch kein Auto angelegt.{" "}
+          <button onClick={() => setTab("autos")} className="font-bold text-blue-900 underline">Unter „Autos" anlegen →</button>
+        </Card>
+      )}
+      {shownAutos.map((a) => {
+        const motor = motoren.find((m) => m.id === a.motorId);
+        const gesamt = a.startAuto + litersFor(fahrten, "autoId", a.id, null);
+        return (
+          <Card key={a.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xl font-extrabold text-slate-900">{a.name}</span>
+              <span className="text-sm text-slate-500 tabular-nums">{fmt(gesamt)} L gesamt</span>
+            </div>
+            <div className="text-sm text-slate-500 mb-2">Motor: {motor ? motor.name : "–"}</div>
+            <TankBar name="Freilauf Vorne" stand={partStand(fahrten, "autoId", a.id, a.fv)} cfg={settings.fv} />
+            <TankBar name="Freilauf Gang 1" stand={partStand(fahrten, "autoId", a.id, a.fg1)} cfg={settings.fg1} />
+          </Card>
+        );
+      })}
+      <div className="flex items-center justify-between pt-2">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-blue-900">Motor im Auto</h2>
+        {activeAuto && motoren.length > 0 && (
+          <select className="rounded-xl border border-slate-300 px-2 py-1 text-sm bg-white" value={activeAuto.motorId || ""}
+            onChange={(e) => up((d) => ({ autos: d.autos.map((a) => a.id === activeAuto.id ? { ...a, motorId: e.target.value } : a) }))}>
+            <option value="">– kein Motor –</option>
+            {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        )}
+      </div>
+      {shownMotoren.length === 0 && (
+        <Card className="text-sm text-slate-600">
+          {motoren.length === 0 ? (
+            <>Noch kein Motor angelegt.{" "}
+              <button onClick={() => setTab("motoren")} className="font-bold text-blue-900 underline">Jetzt anlegen →</button></>
+          ) : (
+            <>Kein Motor im aktiven Auto ausgewählt – wähle unter „Autos" beim Auto einen Motor aus.</>
+          )}
+        </Card>
+      )}
+      {shownMotoren.map((m) => {
+        const s = motorStands(fahrten, m);
+        const parts = [
+          ["Hauptlager", s.hl, settings.hl, m.hl.note], ["Frontlager", s.fl, settings.fl, m.fl.note], ["Pleuel", s.pl, settings.pl, m.pl.note],
+        ];
+        const next = parts.map(([n, st, c]) => ({ n, ...statusOf(st, c) })).sort((a, b) => a.rest - b.rest)[0];
+        return (
+          <Card key={m.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-lg font-extrabold text-slate-900">{m.name}</span>
+              <span className="text-sm text-slate-500 tabular-nums">{fmt(s.gesamt)} L</span>
+            </div>
+            {parts.map(([n, st, c, note]) => <TankBar key={n} name={n} note={note} stand={st} cfg={c} />)}
+            <div className="mt-2 text-sm font-semibold text-slate-700">
+              {next.rest <= 0 ? "⚠️ JETZT fällig: " : "Nächste Wartung: "}{next.n}
+              {next.rest > 0 ? ` in ${fmt(next.rest)} L` : ""}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
+  const [datum, setDatum] = useState(today());
+  const [autoId, setAutoId] = useState(autos.find((a) => a.id === activeAutoId)?.id || autos[0]?.id || "");
+  const auto = autos.find((a) => a.id === autoId);
+  const [motorId, setMotorId] = useState(auto?.motorId || motoren[0]?.id || "");
+  const [liter, setLiter] = useState("");
+  const [notiz, setNotiz] = useState("");
+  if (autos.length === 0 || motoren.length === 0) {
+    return (
+      <Card className="text-sm text-slate-600 space-y-2">
+        <p className="font-bold text-slate-900">Bevor Du Fahrten eintragen kannst:</p>
+        {motoren.length === 0 && <button onClick={() => setTab("motoren")} className="block font-bold text-blue-900 underline">1. Motor anlegen →</button>}
+        {autos.length === 0 && <button onClick={() => setTab("autos")} className="block font-bold text-blue-900 underline">{motoren.length === 0 ? "2." : "1."} Auto anlegen →</button>}
+      </Card>
+    );
+  }
+  const add = () => {
+    const l = parseNum(liter);
+    if (!autoId || !motorId || l <= 0) return;
+    up((d) => ({ fahrten: [...d.fahrten, { id: uid(), datum, autoId, motorId, liter: l, notiz }] }));
+    setLiter(""); setNotiz("");
+  };
+  return (
+    <div className="space-y-4">
+      <Card>
+        <h2 className="text-lg font-extrabold text-slate-900 mb-3">Fahrt eintragen</h2>
+        <Field label="Datum"><input type="date" className={inputCls} value={datum} onChange={(e) => setDatum(e.target.value)} /></Field>
+        <Field label="Auto">
+          <select className={inputCls} value={autoId} onChange={(e) => { setAutoId(e.target.value); const a2 = autos.find((a) => a.id === e.target.value); if (a2?.motorId) setMotorId(a2.motorId); }}>
+            {autos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Motor">
+          <select className={inputCls} value={motorId} onChange={(e) => setMotorId(e.target.value)}>
+            {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Laufleistung [L]">
+          <input inputMode="decimal" placeholder="z. B. 0,5" className={inputCls} value={liter} onChange={(e) => setLiter(e.target.value)} />
+        </Field>
+        <div className="flex gap-2 mb-3">
+          {[0.25, 0.5, 1].map((v) => (
+            <button key={v} onClick={() => setLiter(String(parseNum(liter) + v).replace(".", ","))}
+              className="flex-1 rounded-xl border border-slate-300 py-2 text-sm font-semibold text-slate-700 active:bg-slate-100">+{String(v).replace(".", ",")} L</button>
+          ))}
+        </div>
+        <Field label="Notiz (optional)"><input className={inputCls} value={notiz} onChange={(e) => setNotiz(e.target.value)} /></Field>
+        <button onClick={add} disabled={parseNum(liter) <= 0}
+          className="w-full rounded-xl bg-blue-900 text-white font-bold py-3 disabled:opacity-40 active:bg-blue-800">Fahrt speichern</button>
+      </Card>
+      <h2 className="text-sm font-bold uppercase tracking-widest text-blue-900">Letzte Fahrten</h2>
+      {fahrten.length === 0 && <Card className="text-sm text-slate-500">Noch keine Fahrten – trage oben Deine erste ein.</Card>}
+      {[...fahrten].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 20).map((f) => (
+        <Card key={f.id} className="flex items-center justify-between py-3">
+          <div>
+            <div className="font-semibold text-slate-900 tabular-nums">{fmtDate(f.datum)} · {fmt(f.liter)} L</div>
+            <div className="text-xs text-slate-500">
+              {autos.find((a) => a.id === f.autoId)?.name || "?"} · {motoren.find((m) => m.id === f.motorId)?.name || "?"}{f.notiz ? ` · ${f.notiz}` : ""}
+            </div>
+          </div>
+          <ConfirmButton label="Löschen" confirmLabel="Sicher?"
+            onConfirm={() => up((d) => ({ fahrten: d.fahrten.filter((x) => x.id !== f.id) }))}
+            className="text-red-600 text-sm font-semibold px-2 py-1 rounded-lg" />
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMotorId }) {
+  const motor = motoren.find((m) => m.id === editMotorId);
+  const setMotor = (patch) => up((d) => ({ motoren: d.motoren.map((m) => (m.id === editMotorId ? { ...m, ...patch } : m)) }));
+  if (motor) {
+    const s = motorStands(fahrten, motor);
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setEditMotorId(null)} className="text-blue-900 font-semibold text-sm">← Zurück zur Liste</button>
+        <Card>
+          <Field label="Motor-Name">
+            <input className={`${inputCls} font-extrabold`} value={motor.name} onChange={(e) => setMotor({ name: e.target.value })} />
+          </Field>
+          <div className="text-sm text-slate-600 mb-3 tabular-nums">Gesamt: {fmt(s.gesamt)} L · HL {fmt(s.hl)} L · FL {fmt(s.fl)} L · Pleuel {fmt(s.pl)} L</div>
+          <PartEditor title="Motor gesamt" part={motor.motor} onChange={(p) => setMotor({ motor: p })} />
+          <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote />
+          <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote />
+          <PartEditor title="Pleuel" part={motor.pl} onChange={(p) => setMotor({ pl: p })} withNote />
+        </Card>
+        <Card>
+          <h3 className="font-bold text-slate-900 mb-3">Setup & Notizen</h3>
+          {SPEC_FIELDS.map(([key, label]) => (
+            <Field key={key} label={label}>
+              <input className={inputCls} value={motor.specs[key] || ""} onChange={(e) => setMotor({ specs: { ...motor.specs, [key]: e.target.value } })} />
+            </Field>
+          ))}
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Durchzug [km/h]"><input inputMode="decimal" className={inputCls} value={motor.durchzug} onChange={(e) => setMotor({ durchzug: e.target.value })} /></Field>
+            <Field label="Topspeed [km/h]"><input inputMode="decimal" className={inputCls} value={motor.topspeed} onChange={(e) => setMotor({ topspeed: e.target.value })} /></Field>
+          </div>
+          <Field label="Notizen"><textarea rows={2} className={inputCls} value={motor.notizen} onChange={(e) => setMotor({ notizen: e.target.value })} /></Field>
+        </Card>
+        <ConfirmButton label="Motor löschen" confirmLabel="Wirklich löschen? Nochmal tippen"
+          onConfirm={() => { up((d) => ({ motoren: d.motoren.filter((m) => m.id !== editMotorId) })); setEditMotorId(null); }}
+          className="w-full rounded-xl border border-red-300 text-red-600 font-bold py-3" />
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {motoren.length === 0 && <Card className="text-sm text-slate-500">Noch kein Motor – lege unten Deinen ersten an.</Card>}
+      {motoren.map((m) => {
+        const s = motorStands(fahrten, m);
+        const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl)]
+          .sort((a, b) => a.rest - b.rest)[0];
+        return (
+          <Card key={m.id} className="flex items-center justify-between active:bg-slate-50" >
+            <button onClick={() => setEditMotorId(m.id)} className="flex-1 text-left">
+              <div className="font-extrabold text-slate-900">{m.name}</div>
+              <div className="text-xs text-slate-500 tabular-nums">{fmt(s.gesamt)} L gesamt</div>
+            </button>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[worst.key].chip}`}>{worst.label}</span>
+          </Card>
+        );
+      })}
+      <button onClick={() => { const id = uid(); up((d) => ({ motoren: [...d.motoren, { id, name: "Neuer Motor", motor: { reset: today(), start: 0 }, hl: { reset: today(), start: 0 }, fl: { reset: today(), start: 0 }, pl: { reset: today(), start: 0 }, specs: {}, durchzug: "", topspeed: "", notizen: "" }] })); setEditMotorId(id); }}
+        className="w-full rounded-xl bg-blue-900 text-white font-bold py-3">+ Motor hinzufügen</button>
+    </div>
+  );
+}
+
+function RanglisteScreen({ motoren }) {
+  const rangliste = motoren
+    .map((m) => ({ m, ts: parseNum(m.topspeed), dz: parseNum(m.durchzug) }))
+    .sort((a, b) => b.ts - a.ts || b.dz - a.dz);
+  return (
+    <div className="space-y-3">
+      {rangliste.length === 0 && <Card className="text-sm text-slate-500">Noch keine Motoren angelegt.</Card>}
+      {rangliste.map((r, i) => (
+        <Card key={r.m.id} className="flex items-center gap-3">
+          <span className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold ${i === 0 ? "bg-amber-300 text-amber-900" : "bg-slate-200 text-slate-700"}`}>{i + 1}</span>
+          <div className="flex-1">
+            <div className="font-bold text-slate-900">{r.m.name}</div>
+            <div className="text-xs text-slate-500 tabular-nums">
+              Topspeed {r.m.topspeed ? `${r.m.topspeed} km/h` : "–"} · Durchzug {r.m.durchzug ? `${r.m.durchzug} km/h` : "–"}
+            </div>
+          </div>
+        </Card>
+      ))}
+      <p className="text-xs text-slate-500 px-1">Sortiert nach Topspeed, dann Durchzug. Werte trägst Du beim jeweiligen Motor ein – die Liste aktualisiert sich automatisch.</p>
+    </div>
+  );
+}
+
+function AutosScreen({ autos, motoren, fahrten, up, activeAutoId, editAutoId, setEditAutoId }) {
+  const auto = autos.find((a) => a.id === editAutoId);
+  const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
+  if (auto) {
+    const gesamt = auto.startAuto + litersFor(fahrten, "autoId", auto.id, null);
+    const isActive = auto.id === activeAutoId || (!activeAutoId && autos[0]?.id === auto.id);
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setEditAutoId(null)} className="text-blue-900 font-semibold text-sm">← Zurück zur Liste</button>
+        <Card>
+          <Field label="Auto-Name">
+            <input className={`${inputCls} font-extrabold`} value={auto.name} onChange={(e) => setAuto({ name: e.target.value })} />
+          </Field>
+          <div className="mb-3 flex items-center justify-between">
+            {isActive ? (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">✓ Aktiv im Dashboard</span>
+            ) : (
+              <button onClick={() => up({ activeAutoId: auto.id })}
+                className="text-xs font-bold text-blue-900 border border-blue-900 rounded-full px-3 py-1 active:bg-blue-50">Als aktiv setzen</button>
+            )}
+            <span className="text-sm text-slate-500 tabular-nums">{fmt(gesamt)} L gesamt</span>
+          </div>
+          <Field label="Montierter Motor">
+            <select className={inputCls} value={auto.motorId || ""} onChange={(e) => setAuto({ motorId: e.target.value })}>
+              <option value="">– kein Motor –</option>
+              {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </Field>
+          <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} />
+          <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} />
+        </Card>
+        <ConfirmButton label="Auto löschen" confirmLabel="Wirklich löschen? Nochmal tippen"
+          onConfirm={() => { up((d) => ({ autos: d.autos.filter((a) => a.id !== editAutoId) })); setEditAutoId(null); }}
+          className="w-full rounded-xl border border-red-300 text-red-600 font-bold py-3" />
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {autos.length === 0 && <Card className="text-sm text-slate-500">Noch kein Auto – lege unten Dein erstes an.</Card>}
+      {autos.map((a) => {
+        const isActive = a.id === activeAutoId || (!activeAutoId && autos[0]?.id === a.id);
+        const gesamt = a.startAuto + litersFor(fahrten, "autoId", a.id, null);
+        return (
+          <Card key={a.id} className="flex items-center justify-between active:bg-slate-50">
+            <button onClick={() => setEditAutoId(a.id)} className="flex-1 text-left">
+              <div className="font-extrabold text-slate-900">{a.name}</div>
+              <div className="text-xs text-slate-500 tabular-nums">{fmt(gesamt)} L gesamt · Motor: {motoren.find((m) => m.id === a.motorId)?.name || "–"}</div>
+            </button>
+            {isActive && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Aktiv</span>}
+          </Card>
+        );
+      })}
+      <button onClick={() => { const id = uid(); up((d) => ({ activeAutoId: d.activeAutoId || id, autos: [...d.autos, { id, name: "Neues Auto", motorId: d.motoren[0]?.id || "", startAuto: 0, fv: { reset: today(), start: 0 }, fg1: { reset: today(), start: 0 } }] })); setEditAutoId(id); }}
+        className="w-full rounded-xl bg-blue-900 text-white font-bold py-3">+ Auto hinzufügen</button>
+    </div>
+  );
+}
+
+function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore }) {
+  const [showBackup, setShowBackup] = useState(false);
+  const [restoreText, setRestoreText] = useState("");
+  const [backupMsg, setBackupMsg] = useState("");
+  const backupString = JSON.stringify(fullData);
+  const copyBackup = async () => {
+    try {
+      await navigator.clipboard.writeText(backupString);
+      setBackupMsg("✓ In die Zwischenablage kopiert!");
+    } catch {
+      setBackupMsg("Kopieren nicht möglich – bitte Text unten manuell markieren und kopieren.");
+    }
+    setTimeout(() => setBackupMsg(""), 4000);
+  };
+  const [restoreArmed, setRestoreArmed] = useState(false);
+  const doRestore = () => {
+    const cleaned = restoreText.split(String.fromCharCode(96)).join("").trim();
+    const startIdx = cleaned.indexOf("{");
+    const endIdx = cleaned.lastIndexOf("}");
+    if (!cleaned || startIdx === -1 || endIdx === -1) {
+      setBackupMsg("Bitte zuerst den Sicherungstext in das Feld einfügen.");
+      setTimeout(() => setBackupMsg(""), 4000);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(cleaned.slice(startIdx, endIdx + 1));
+      if (!parsed || !Array.isArray(parsed.autos) || !Array.isArray(parsed.motoren) || !Array.isArray(parsed.fahrten) || typeof parsed.settings !== "object") {
+        throw new Error("ungültig");
+      }
+      if (!restoreArmed) {
+        setRestoreArmed(true);
+        setBackupMsg("⚠️ Sicherung gültig! Nochmal ‚Jetzt überschreiben' tippen zum Bestätigen.");
+        setTimeout(() => { setBackupMsg(""); setRestoreArmed(false); }, 6000);
+        return;
+      }
+      onRestore(parsed);
+      setRestoreText("");
+      setRestoreArmed(false);
+      setBackupMsg("✓ Daten wiederhergestellt!");
+      setTimeout(() => setBackupMsg(""), 4000);
+    } catch {
+      setRestoreArmed(false);
+      setBackupMsg("Das sieht nicht wie eine gültige Sicherung aus – bitte den kompletten Text einfügen.");
+      setTimeout(() => setBackupMsg(""), 5000);
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <Card>
+        <h3 className="font-bold text-slate-900 mb-3">Maximalwerte & Warnungen</h3>
+        {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"]].map(([key, label]) => (
+          <div key={key} className="grid grid-cols-3 gap-2 items-center mb-2">
+            <span className="text-sm font-semibold text-slate-700">{label}</span>
+            <label className="text-xs text-slate-500">Max [L]
+              <input inputMode="decimal" className={`${inputCls} mt-1`} defaultValue={String(settings[key].max).replace(".", ",")}
+                onBlur={(e) => up((d) => ({ settings: { ...d.settings, [key]: { ...d.settings[key], max: parseNum(e.target.value) } } }))} />
+            </label>
+            <label className="text-xs text-slate-500">Gelb ab Rest [L]
+              <input inputMode="decimal" className={`${inputCls} mt-1`} defaultValue={String(settings[key].gelb).replace(".", ",")}
+                onBlur={(e) => up((d) => ({ settings: { ...d.settings, [key]: { ...d.settings[key], gelb: parseNum(e.target.value) } } }))} />
+            </label>
+          </div>
+        ))}
+      </Card>
+      <Card>
+        <h3 className="font-bold text-slate-900 mb-2">Datensicherung</h3>
+        {backupMsg && <p className="text-sm font-semibold text-blue-900 mb-2">{backupMsg}</p>}
+        <div className="flex gap-2 mb-3">
+          <button onClick={() => { setShowBackup((v) => !v); copyBackup(); }}
+            className="flex-1 rounded-xl bg-blue-900 text-white font-bold py-3 active:bg-blue-800">Daten sichern</button>
+        </div>
+        {showBackup && (
+          <label className="block mb-4 text-xs text-slate-500">Deine Sicherung (Text aufbewahren, z. B. in Notizen einfügen):
+            <textarea readOnly rows={4} className={`${inputCls} mt-1 text-xs`} value={backupString}
+              onFocus={(e) => e.target.select()} />
+          </label>
+        )}
+        <label className="block text-xs text-slate-500">Daten wiederherstellen – gesicherten Text hier einfügen:
+          <textarea rows={3} className={`${inputCls} mt-1 text-xs`} value={restoreText} placeholder='{"activeAutoId":...}'
+            onChange={(e) => setRestoreText(e.target.value)} />
+        </label>
+        <button onClick={doRestore}
+          className={`w-full rounded-xl font-bold py-3 mt-2 ${restoreArmed ? "bg-red-600 text-white" : "border border-blue-900 text-blue-900 active:bg-blue-50"}`}>
+          {restoreArmed ? "Jetzt überschreiben" : "Wiederherstellen"}</button>
+      </Card>
+      <ConfirmButton label="Alle Daten zurücksetzen" confirmLabel="Wirklich ALLES löschen? Nochmal tippen"
+        onConfirm={onResetAll}
+        className="w-full rounded-xl border border-red-300 text-red-600 font-bold py-3" />
+    </div>
+  );
+}
+
+// ---------- Main App ----------
+function App() {
+  const [data, setData] = useState(null);
+  const [tab, setTab] = useState("start");
+  const [editMotorId, setEditMotorId] = useState(null);
+  const [editAutoId, setEditAutoId] = useState(null);
+  const [saveState, setSaveState] = useState("");
+  const saveTimer = useRef(null);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = localStorage.getItem("vg8-data");
+        setData(raw ? JSON.parse(raw) : seedData());
+      } catch {
+        setData(seedData());
+      }
+      loaded.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!data || !loaded.current) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        localStorage.setItem("vg8-data", JSON.stringify(data));
+        setSaveState("Gespeichert");
+        setTimeout(() => setSaveState(""), 1500);
+      } catch {
+        setSaveState("Speichern fehlgeschlagen");
+      }
+    }, 500);
+  }, [data]);
+
+  if (!data) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-500">Lade Daten…</div>;
+  }
+
+  const { autos, motoren, fahrten, settings } = data;
+  // up akzeptiert ein Objekt ODER eine Funktion (d) => patch – immer auf aktuellem Stand
+  const up = (patch) => setData((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) }));
+
+  const tabs = [
+    ["start", "Start", "📊"], ["fahrt", "Fahrt", "⛽"], ["autos", "Autos", "🚗"], ["motoren", "Motoren", "🔧"],
+    ["rang", "Rangliste", "🏁"], ["mehr", "Mehr", "⚙️"],
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif" }}>
+      <header className="sticky top-0 z-10 bg-blue-900 text-white px-4 py-3 flex items-baseline justify-between shadow">
+        <h1 className="font-extrabold tracking-tight text-lg">Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 align-middle">v3</span></h1>
+        <span className="text-xs text-blue-200">{saveState}</span>
+      </header>
+      <main className="max-w-md mx-auto px-4 py-4 pb-28">
+        {tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} />}
+        {tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
+        {tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
+        {tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId} />}
+        {tab === "rang" && <RanglisteScreen motoren={motoren} />}
+        {tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
+          fullData={data} onRestore={(d) => setData(d)}
+          onResetAll={() => setData(seedData())} />}
+      </main>
+      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {tabs.map(([key, label, icon]) => (
+          <button key={key} onClick={() => { setTab(key); if (key !== "motoren") setEditMotorId(null); if (key !== "autos") setEditAutoId(null); }}
+            className={`flex flex-col items-center py-2 px-2 text-xs font-semibold ${tab === key ? "text-blue-900" : "text-slate-400"}`}>
+            <span className="text-xl leading-none mb-0.5">{icon}</span>{label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
