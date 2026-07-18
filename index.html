@@ -325,7 +325,7 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
   );
 }
 
-function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMotorId }) {
+function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMotorId, activeMotorId }) {
   const motor = motoren.find((m) => m.id === editMotorId);
   const setMotor = (patch) => up((d) => ({ motoren: d.motoren.map((m) => (m.id === editMotorId ? { ...m, ...patch } : m)) }));
   if (motor) {
@@ -369,10 +369,14 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
         const s = motorStands(fahrten, m);
         const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl)]
           .sort((a, b) => a.rest - b.rest)[0];
+        const isActive = m.id === activeMotorId;
         return (
           <Card key={m.id} className="flex items-center justify-between active:bg-slate-800" >
             <button onClick={() => setEditMotorId(m.id)} className="flex-1 text-left">
-              <div className="font-extrabold text-slate-100">{m.name}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-slate-100">{m.name}</span>
+                {isActive && <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Aktiv</span>}
+              </div>
               <div className="text-xs text-slate-400 tabular-nums">{fmt(s.gesamt)} L gesamt</div>
             </button>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[worst.key].chip}`}>{worst.label}</span>
@@ -663,14 +667,15 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v7</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v8</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
         {tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} fullData={data} doBackup={doBackup} />}
         {tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
         {tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
-        {tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId} />}
+        {tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
+          activeMotorId={(autos.find((a) => a.id === data.activeAutoId) || autos[0])?.motorId || null} />}
         {tab === "rang" && <RanglisteScreen motoren={motoren} />}
         {tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
           fullData={data} onRestore={(d) => setData(d)} doBackup={doBackup}
