@@ -81,7 +81,7 @@ function TankBar({ name, note, stand, cfg }) {
     <div className="py-1.5">
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-          {name}{note ? <span className="normal-case tracking-normal font-bold text-slate-800"> · {note}</span> : null}
+          {name}{note ? <span className="normal-case tracking-normal font-bold text-slate-800">{name ? " · " : ""}{note}</span> : null}
         </span>
         <span className="text-xs text-slate-500 tabular-nums">
           {fmt(stand)} / {fmt(cfg.max)} L · <span className={`px-1.5 py-0.5 rounded-full font-bold ${sty.chip}`}>{st.label}</span>
@@ -124,7 +124,7 @@ function ConfirmButton({ label, confirmLabel, onConfirm, className }) {
   );
 }
 
-function PartEditor({ title, part, onChange, withNote }) {
+function PartEditor({ title, part, onChange, withNote, stand, cfg }) {
   return (
     <div className="border border-slate-200 rounded-xl p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
@@ -132,6 +132,7 @@ function PartEditor({ title, part, onChange, withNote }) {
         <button onClick={() => onChange({ ...part, reset: today(), start: 0 })}
           className="text-xs font-bold text-blue-900 border border-blue-900 rounded-full px-3 py-1 active:bg-blue-50">Teil getauscht → 0</button>
       </div>
+      {cfg && stand !== undefined && <TankBar name="" note={part.note} stand={stand} cfg={cfg} />}
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-slate-500">Reset am
           <input type="date" className={`${inputCls} mt-1`} value={part.reset} onChange={(e) => onChange({ ...part, reset: e.target.value })} />
@@ -317,12 +318,9 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           </Field>
           <div className="text-sm text-slate-600 mb-3 tabular-nums">Gesamt: {fmt(s.gesamt)} L · HL {fmt(s.hl)} L · FL {fmt(s.fl)} L · Pleuel {fmt(s.pl)} L</div>
           <PartEditor title="Motor gesamt" part={motor.motor} onChange={(p) => setMotor({ motor: p })} />
-          <TankBar name="Hauptlager" note={motor.hl.note} stand={s.hl} cfg={settings.hl} />
-          <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote />
-          <TankBar name="Frontlager" note={motor.fl.note} stand={s.fl} cfg={settings.fl} />
-          <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote />
-          <TankBar name="Pleuel" note={motor.pl.note} stand={s.pl} cfg={settings.pl} />
-          <PartEditor title="Pleuel" part={motor.pl} onChange={(p) => setMotor({ pl: p })} withNote />
+          <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote stand={s.hl} cfg={settings.hl} />
+          <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote stand={s.fl} cfg={settings.fl} />
+          <PartEditor title="Pleuel" part={motor.pl} onChange={(p) => setMotor({ pl: p })} withNote stand={s.pl} cfg={settings.pl} />
         </Card>
         <Card>
           <h3 className="font-bold text-slate-900 mb-3">Setup & Notizen</h3>
@@ -389,11 +387,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-function AutosScreen({ autos, motoren, fahrten, up, activeAutoId, editAutoId, setEditAutoId }) {
+function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
   if (auto) {
     const gesamt = auto.startAuto + litersFor(fahrten, "autoId", auto.id, null);
+    const fvStand = partStand(fahrten, "autoId", auto.id, auto.fv);
+    const fg1Stand = partStand(fahrten, "autoId", auto.id, auto.fg1);
     const isActive = auto.id === activeAutoId || (!activeAutoId && autos[0]?.id === auto.id);
     return (
       <div className="space-y-4">
@@ -417,8 +417,8 @@ function AutosScreen({ autos, motoren, fahrten, up, activeAutoId, editAutoId, se
               {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </Field>
-          <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} />
-          <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} />
+          <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} stand={fvStand} cfg={settings.fv} />
+          <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
         <ConfirmButton label="Auto löschen" confirmLabel="Wirklich löschen? Nochmal tippen"
           onConfirm={() => { up((d) => ({ autos: d.autos.filter((a) => a.id !== editAutoId) })); setEditAutoId(null); }}
@@ -592,13 +592,13 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif" }}>
       <header className="sticky top-0 z-10 bg-blue-900 text-white px-4 py-3 flex items-baseline justify-between shadow">
-        <h1 className="font-extrabold tracking-tight text-lg">Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 align-middle">v3</span></h1>
+        <h1 className="font-extrabold tracking-tight text-lg flex items-center gap-2">Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5">v5</span></h1>
         <span className="text-xs text-blue-200">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
         {tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} />}
         {tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
-        {tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
+        {tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
         {tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId} />}
         {tab === "rang" && <RanglisteScreen motoren={motoren} />}
         {tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
