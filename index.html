@@ -317,8 +317,11 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           </Field>
           <div className="text-sm text-slate-600 mb-3 tabular-nums">Gesamt: {fmt(s.gesamt)} L · HL {fmt(s.hl)} L · FL {fmt(s.fl)} L · Pleuel {fmt(s.pl)} L</div>
           <PartEditor title="Motor gesamt" part={motor.motor} onChange={(p) => setMotor({ motor: p })} />
+          <TankBar name="Hauptlager" note={motor.hl.note} stand={s.hl} cfg={settings.hl} />
           <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote />
+          <TankBar name="Frontlager" note={motor.fl.note} stand={s.fl} cfg={settings.fl} />
           <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote />
+          <TankBar name="Pleuel" note={motor.pl.note} stand={s.pl} cfg={settings.pl} />
           <PartEditor title="Pleuel" part={motor.pl} onChange={(p) => setMotor({ pl: p })} withNote />
         </Card>
         <Card>
