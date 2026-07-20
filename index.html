@@ -50,8 +50,18 @@ const seedData = () => ({
   settings: {
     fv: { max: 12, gelb: 3 }, fg1: { max: 8, gelb: 2 },
     hl: { max: 5, gelb: 1 }, fl: { max: 5, gelb: 1 }, pl: { max: 5, gelb: 1 },
+    kz: { max: 4, gelb: 1 },
   },
 });
+
+const KZ_DEFAULT = () => ({ reset: "2020-01-01", start: 0, note: "", checkedAt: 0 });
+const normalizeData = (d) => {
+  const base = seedData();
+  const out = { ...base, ...d };
+  out.settings = { ...base.settings, ...(d.settings || {}) };
+  out.motoren = (d.motoren || []).map((m) => ({ ...m, kz: m.kz || KZ_DEFAULT() }));
+  return out;
+};
 
 // ---------- Calculations ----------
 const litersFor = (fahrten, field, id, resetDate) =>
@@ -65,6 +75,7 @@ const motorStands = (fahrten, m) => ({
   hl: partStand(fahrten, "motorId", m.id, m.hl),
   fl: partStand(fahrten, "motorId", m.id, m.fl),
   pl: partStand(fahrten, "motorId", m.id, m.pl),
+  kz: partStand(fahrten, "motorId", m.id, m.kz || KZ_DEFAULT()),
 });
 
 const statusOf = (stand, cfg) => {
@@ -132,15 +143,27 @@ function ConfirmButton({ label, confirmLabel, onConfirm, className }) {
   );
 }
 
-function PartEditor({ title, part, onChange, withNote, stand, cfg }) {
+function PartEditor({ title, part, onChange, withNote, stand, cfg, pruefIntervall }) {
+  const [open, setOpen] = useState(false);
+  const history = part.history || [];
+  const seitPruefung = pruefIntervall && stand !== undefined ? stand - (part.checkedAt || 0) : 0;
+  const pruefungFaellig = pruefIntervall && seitPruefung >= pruefIntervall;
   return (
     <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-slate-100">{title}</span>
-        <button onClick={() => onChange({ ...part, reset: today(), start: 0 })}
+        <button onClick={() => onChange({ ...part, reset: today(), start: 0, checkedAt: 0,
+            history: [...history, { note: part.note || "", liter: stand !== undefined ? Math.round(stand * 10) / 10 : null, bis: today() }] })}
           className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1 active:bg-amber-400/10">Teil getauscht → 0</button>
       </div>
       {cfg && stand !== undefined && <TankBar name="" note={part.note} stand={stand} cfg={cfg} />}
+      {pruefungFaellig && (
+        <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-2 my-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-amber-200">🔍 {title} prüfen – {fmt(seitPruefung)} L seit letzter Prüfung</span>
+          <button onClick={() => onChange({ ...part, checkedAt: stand })}
+            className="shrink-0 text-xs font-bold rounded-full bg-amber-400 text-slate-950 px-3 py-1 active:bg-amber-300">Geprüft ✓</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-slate-400">Reset am
           <input type="date" className={`${inputCls} mt-1`} value={part.reset} onChange={(e) => onChange({ ...part, reset: e.target.value })} />
@@ -156,6 +179,22 @@ function PartEditor({ title, part, onChange, withNote, stand, cfg }) {
           <input className={`${inputCls} mt-1`} placeholder="z. B. O.S Lager" value={part.note || ""}
             onChange={(e) => onChange({ ...part, note: e.target.value })} />
         </label>
+      )}
+      {history.length > 0 && (
+        <div className="mt-2">
+          <button onClick={() => setOpen((v) => !v)} className="text-xs font-bold text-slate-300 active:text-amber-300">
+            📜 Historie ({history.length}) {open ? "▲" : "▼"}
+          </button>
+          {open && (
+            <div className="mt-1 space-y-1">
+              {[...history].reverse().map((h, i) => (
+                <div key={i} className="text-xs text-slate-400 tabular-nums border-l-2 border-slate-700 pl-2">
+                  {h.note || "Ohne Notiz"} – {h.liter !== null && h.liter !== undefined ? `${fmt(h.liter)} L` : "? L"} · ausgebaut {fmtDate(h.bis)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -234,9 +273,12 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
       )}
       {shownMotoren.map((m) => {
         const s = motorStands(fahrten, m);
+        const kz = m.kz || KZ_DEFAULT();
         const parts = [
           ["Hauptlager", s.hl, settings.hl, m.hl.note], ["Frontlager", s.fl, settings.fl, m.fl.note], ["Pleuel", s.pl, settings.pl, m.pl.note],
+          ["Kerze", s.kz, settings.kz, kz.note],
         ];
+        const kzCheck = s.kz - (kz.checkedAt || 0);
         const next = parts.map(([n, st, c]) => ({ n, ...statusOf(st, c) })).sort((a, b) => a.rest - b.rest)[0];
         return (
           <Card key={m.id}>
@@ -245,6 +287,9 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
               <span className="text-sm text-slate-400 tabular-nums">{fmt(s.gesamt)} L</span>
             </div>
             {parts.map(([n, st, c, note]) => <TankBar key={n} name={n} note={note} stand={st} cfg={c} />)}
+            {kzCheck >= 1 && (
+              <div className="mt-1 text-xs font-semibold text-amber-200">🔍 Kerze prüfen – {fmt(kzCheck)} L seit letzter Prüfung (im Motoren-Blatt bestätigen)</div>
+            )}
             <div className="mt-2 text-sm font-semibold text-slate-200">
               {next.rest <= 0 ? "⚠️ JETZT fällig: " : "Nächste Wartung: "}{next.n}
               {next.rest > 0 ? ` in ${fmt(next.rest)} L` : ""}
@@ -342,6 +387,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote stand={s.hl} cfg={settings.hl} />
           <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote stand={s.fl} cfg={settings.fl} />
           <PartEditor title="Pleuel" part={motor.pl} onChange={(p) => setMotor({ pl: p })} withNote stand={s.pl} cfg={settings.pl} />
+          <PartEditor title="Kerze" part={motor.kz || KZ_DEFAULT()} onChange={(p) => setMotor({ kz: p })} withNote stand={s.kz} cfg={settings.kz} pruefIntervall={1} />
         </Card>
         <Card>
           <h3 className="font-bold text-slate-100 mb-3">Setup & Notizen</h3>
@@ -367,7 +413,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
       {motoren.length === 0 && <Card className="text-sm text-slate-400">Noch kein Motor – lege unten Deinen ersten an.</Card>}
       {motoren.map((m) => {
         const s = motorStands(fahrten, m);
-        const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl)]
+        const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl), statusOf(s.kz, settings.kz)]
           .sort((a, b) => a.rest - b.rest)[0];
         const isActive = m.id === activeMotorId;
         return (
@@ -523,7 +569,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
     <div className="space-y-4">
       <Card>
         <h3 className="font-bold text-slate-100 mb-3">Maximalwerte & Warnungen</h3>
-        {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"]].map(([key, label]) => (
+        {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"], ["kz", "Kerze"]].map(([key, label]) => (
           <div key={key} className="grid grid-cols-3 gap-2 items-center mb-2">
             <span className="text-sm font-semibold text-slate-200">{label}</span>
             <label className="text-xs text-slate-400">Max [L]
@@ -610,7 +656,7 @@ function App() {
     (async () => {
       try {
         const raw = localStorage.getItem("vg8-data");
-        setData(raw ? JSON.parse(raw) : seedData());
+        setData(raw ? normalizeData(JSON.parse(raw)) : seedData());
       } catch {
         setData(seedData());
       }
@@ -667,7 +713,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v8</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v9</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
@@ -678,7 +724,7 @@ function App() {
           activeMotorId={(autos.find((a) => a.id === data.activeAutoId) || autos[0])?.motorId || null} />}
         {tab === "rang" && <RanglisteScreen motoren={motoren} />}
         {tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
-          fullData={data} onRestore={(d) => setData(d)} doBackup={doBackup}
+          fullData={data} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
           onResetAll={() => setData(seedData())} />}
       </main>
       <nav className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-700/60 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
