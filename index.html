@@ -461,6 +461,45 @@ function RanglisteScreen({ motoren }) {
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
+  const [shTestMsg, setShTestMsg] = useState("");
+  const [shTestBusy, setShTestBusy] = useState(false);
+  const testSpeedhive = async () => {
+    const tx = String((auto && auto.transponder) || "").trim();
+    if (!tx) { setShTestMsg("Bitte zuerst die Transponder-Nr. eintragen."); return; }
+    setShTestBusy(true);
+    setShTestMsg("Teste Verbindung zu Speedhive …");
+    const urls = [
+      "https://practice-api.speedhive.com/api/v1/chips/" + encodeURIComponent(tx) + "/activities?count=5",
+      "https://practice-api.speedhive.com/api/v1/training/activities?chipCode=" + encodeURIComponent(tx) + "&count=5",
+    ];
+    for (const u of urls) {
+      try {
+        const r = await fetch(u, { headers: { Accept: "application/json" } });
+        if (r.ok) {
+          let j = null;
+          try { j = await r.json(); } catch { j = null; }
+          const list = Array.isArray(j) ? j : (j && (j.activities || j.items || j.data)) || [];
+          if (list.length > 0) {
+            const a0 = list[0];
+            const wann = a0.startTime || a0.dateTime || a0.date || "?";
+            const wo = (a0.location && a0.location.name) || a0.locationName || a0.trackName || "?";
+            setShTestMsg("✅ Verbindung OK! " + list.length + " Session(s) gefunden. Neueste: " + wann + " · " + wo);
+          } else {
+            setShTestMsg("✅ Verbindung OK, aber keine Sessions gefunden. Nummer korrekt? Ergebnisse im MYLAPS-Konto auf öffentlich?");
+          }
+          setShTestBusy(false);
+          return;
+        }
+        if (r.status === 401 || r.status === 403) {
+          setShTestMsg("⚠️ Zugriff verweigert (Status " + r.status + ") – Ergebnisse stehen vermutlich auf privat.");
+          setShTestBusy(false);
+          return;
+        }
+      } catch (e) { /* CORS/Netzwerk – nächste Variante testen */ }
+    }
+    setShTestMsg("❌ Kein direkter Zugriff möglich (vermutlich Cross-Origin-Sperre des Servers). Melde mir dieses Ergebnis – dann bauen wir Plan B über einen Zwischendienst.");
+    setShTestBusy(false);
+  };
   if (auto) {
     const gesamt = auto.startAuto + litersFor(fahrten, "autoId", auto.id, null);
     const fvStand = partStand(fahrten, "autoId", auto.id, auto.fv);
@@ -488,6 +527,13 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
               {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </Field>
+          <Field label="Transponder-Nr. (Speedhive)">
+            <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
+              onChange={(e) => setAuto({ transponder: e.target.value })} />
+          </Field>
+          <button onClick={testSpeedhive} disabled={shTestBusy}
+            className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">📡 Speedhive-Verbindung testen</button>
+          {shTestMsg && <p className="text-xs font-semibold text-amber-200 mb-3">{shTestMsg}</p>}
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -713,7 +759,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v9</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v10</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
