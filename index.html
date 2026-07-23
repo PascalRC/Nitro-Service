@@ -722,35 +722,36 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
     const tx = String((auto && auto.transponder) || "").trim();
     if (!tx) { setShTestMsg("Bitte zuerst die Transponder-Nr. eintragen."); return; }
     setShTestBusy(true);
-    setShTestMsg("Teste Verbindung zu Speedhive …");
-    const target = "https://practice-api.speedhive.com/api/v1/chips/" + encodeURIComponent(tx) + "/activities?count=5";
-    const wege = [
-      ["direkt", target],
-      ["Proxy 1", "https://corsproxy.io/?url=" + encodeURIComponent(target)],
-      ["Proxy 2", "https://api.allorigins.win/raw?url=" + encodeURIComponent(target)],
-      ["Proxy 3", "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(target)],
+    setShTestMsg("Diagnose läuft …");
+    const ziele = [
+      ["A", "https://practice-api.speedhive.com/api/v1/chips/" + tx + "/activities?count=3"],
+      ["B", "https://practice-api.speedhive.com/api/v1/training/activities?chipCode=" + tx + "&count=3"],
+      ["C", "https://practice-api.speedhive.com/api/v1/accounts/activities?chipCode=" + tx + "&count=3"],
+      ["D", "https://practice-api.speedhive.com/api/v1/locations?sportCategory=Motorized"],
     ];
-    for (const [name, u] of wege) {
-      try {
-        const r = await fetch(u, { headers: { Accept: "application/json" } });
-        if (!r.ok) { continue; }
-        let j = null;
-        try { j = await r.json(); } catch { j = null; }
-        const list = (j && (j.activities || j.items || j.data)) || (Array.isArray(j) ? j : []);
-        if (list && list.length > 0) {
-          const a0 = list[0];
-          const wann = a0.startTime || a0.dateTimeStart || "?";
-          const wo = (a0.location && a0.location.name) || a0.chipLabel || "";
-          setShTestMsg("✅ Klappt über " + name + "! " + list.length + " Session(s) gefunden. Neueste: " + String(wann).slice(0, 16).replace("T", " ") + (wo ? " · " + wo : "") + " — melde mir das, dann baue ich die Rundenzeiten ein.");
-          setShTestBusy(false);
-          return;
+    const routen = [
+      ["direkt", (u) => u],
+      ["P1", (u) => "https://corsproxy.io/?url=" + encodeURIComponent(u)],
+      ["P2", (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u)],
+      ["P3", (u) => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)],
+    ];
+    const zeilen = [];
+    for (const [zname, ziel] of ziele) {
+      for (const [rname, mk] of routen) {
+        try {
+          const r = await fetch(mk(ziel), { headers: { Accept: "application/json" } });
+          let extra = "";
+          if (r.ok) {
+            const t = await r.text();
+            extra = " len=" + t.length + (t.length > 0 ? " start=" + t.slice(0, 40).replace(/\s+/g, " ") : "");
+          }
+          zeilen.push(zname + "/" + rname + ": " + r.status + extra);
+        } catch (e) {
+          zeilen.push(zname + "/" + rname + ": BLOCKIERT");
         }
-        setShTestMsg("✅ Verbindung über " + name + " OK, aber 0 Sessions. Transponder-Nr. korrekt? Ergebnisse im MYLAPS-Konto auf öffentlich?");
-        setShTestBusy(false);
-        return;
-      } catch (e) { /* nächsten Weg versuchen */ }
+      }
     }
-    setShTestMsg("❌ Kein Weg hat funktioniert – weder direkt noch über die drei Zwischendienste. Melde mir das, dann suchen wir eine andere Lösung.");
+    setShTestMsg("DIAGNOSE (bitte abfotografieren und mir schicken):\n" + zeilen.join("\n"));
     setShTestBusy(false);
   };
   if (auto) {
@@ -785,8 +786,8 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
               onChange={(e) => setAuto({ transponder: e.target.value })} />
           </Field>
           <button onClick={testSpeedhive} disabled={shTestBusy}
-            className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">📡 Speedhive-Verbindung testen</button>
-          {shTestMsg && <p className="text-xs font-semibold text-amber-200 mb-3">{shTestMsg}</p>}
+            className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">🔬 Speedhive-Diagnose starten</button>
+          {shTestMsg && <pre className="text-[10px] font-mono text-amber-200 mb-3 whitespace-pre-wrap break-all">{shTestMsg}</pre>}
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -1012,7 +1013,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v15</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v16</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
