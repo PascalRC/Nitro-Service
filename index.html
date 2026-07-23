@@ -496,7 +496,6 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapMsg, setLapMsg] = useState("");
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
-  const [manuellOffen, setManuellOffen] = useState(false);
   const [manZeit, setManZeit] = useState("");
   const [manDatum, setManDatum] = useState(today());
   const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
@@ -534,11 +533,34 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   };
   const uebernehmeManuell = async () => {
     if (!manZeit.trim()) { setLapMsg("Bitte zuerst eine Zeit eintragen."); return; }
-    setManuellOffen(false);
     setLapBusy(true);
     setLapMsg("Übernehme manuelle Zeit …");
     await ermittleWetterUndSetzePending(manZeit.trim(), manDatum, manUhrzeit, null);
     setManZeit("");
+  };
+  const findeSchnellste = (text) => {
+    const treffer = String(text).match(/\b(?:\d+:)?\d{1,2}[.,]\d{2,3}\b/g) || [];
+    const zeiten = treffer
+      .map((t) => ({ roh: t.replace(",", "."), sek: parseLapSeconds(t.replace(",", ".")) }))
+      .filter((z) => z.sek !== null && z.sek > 1 && z.sek < 600);
+    if (!zeiten.length) return null;
+    return zeiten.reduce((a, b) => (b.sek < a.sek ? b : a));
+  };
+  const ausZwischenablage = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const beste = findeSchnellste(text);
+      if (!beste) {
+        setLapMsg("In der Zwischenablage wurde keine Rundenzeit gefunden. Kopiere die Session-Ansicht aus Speedhive und versuch es nochmal.");
+        return;
+      }
+      const gefunden = (String(text).match(/\b(?:\d+:)?\d{1,2}[.,]\d{2,3}\b/g) || []).length;
+      setLapBusy(true);
+      setLapMsg("Schnellste von " + gefunden + " gefundenen Zeiten: " + beste.roh + " – ermittle Standort …");
+      await ermittleWetterUndSetzePending(beste.roh, today(), new Date().toTimeString().slice(0, 5), null);
+    } catch (e) {
+      setLapMsg("Zwischenablage konnte nicht gelesen werden. Nutze bitte die manuelle Eingabe.");
+    }
   };
   const speichereGrip = (grip) => {
     if (!pendingLap) return;
@@ -593,37 +615,26 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           {lapMsg && <p className="text-xs font-semibold text-amber-200 mb-2">{lapMsg}</p>}
           {!pendingLap ? (
             <>
-              <button onClick={holeBestzeit} disabled={lapBusy}
-                className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">
-                📡 Neue Bestzeit von Speedhive holen
-              </button>
-              {!manuellOffen ? (
-                <button onClick={() => setManuellOffen(true)} disabled={lapBusy}
-                  className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm mb-3 active:bg-slate-800 disabled:opacity-40">
-                  ✏️ Zeit manuell eintragen
-                </button>
-              ) : (
-                <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
-                  <Field label="Zeit (z. B. 12.345 oder 1:02.345)">
-                    <input inputMode="decimal" placeholder="12.345" className={inputCls} value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <label className="text-xs text-slate-400">Datum
-                      <input type="date" className={`${inputCls} mt-1`} value={manDatum} onChange={(e) => setManDatum(e.target.value)} />
-                    </label>
-                    <label className="text-xs text-slate-400">Uhrzeit
-                      <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
-                    </label>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={uebernehmeManuell} disabled={lapBusy}
-                      className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2 text-sm active:bg-amber-300 disabled:opacity-40">Weiter</button>
-                    <button onClick={() => setManuellOffen(false)}
-                      className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800">Abbrechen</button>
-                  </div>
+              <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
+                <Field label="Schnellste Rundenzeit">
+                  <input inputMode="decimal" placeholder="z. B. 12.345" className={`${inputCls} text-lg font-bold tabular-nums`}
+                    value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
+                </Field>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <label className="text-xs text-slate-400">Datum
+                    <input type="date" className={`${inputCls} mt-1`} value={manDatum} onChange={(e) => setManDatum(e.target.value)} />
+                  </label>
+                  <label className="text-xs text-slate-400">Uhrzeit
+                    <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
+                  </label>
                 </div>
-              )}
-            </>
+                <button onClick={uebernehmeManuell} disabled={lapBusy || !manZeit.trim()}
+                  className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300 disabled:opacity-40">Weiter zu Grip & Temperatur</button>
+              </div>
+              <button onClick={ausZwischenablage} disabled={lapBusy}
+                className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm mb-3 active:bg-slate-800 disabled:opacity-40">
+                📋 Aus Zwischenablage (schnellste Runde suchen)
+              </button>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
               <p className="text-sm font-bold text-amber-200 mb-1">{fmtLap(pendingLap.zeit)} · {fmtDate(pendingLap.datum)} {pendingLap.uhrzeit}</p>
@@ -716,42 +727,6 @@ function RanglisteScreen({ motoren }) {
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
-  const [shTestMsg, setShTestMsg] = useState("");
-  const [shTestBusy, setShTestBusy] = useState(false);
-  const testSpeedhive = async () => {
-    const tx = String((auto && auto.transponder) || "").trim();
-    const act = String((auto && auto.activityId) || "").trim();
-    if (!act) { setShTestMsg("Bitte zuerst die Aktivitäts-ID eintragen (Zahl aus der Speedhive-Adresse)."); return; }
-    setShTestBusy(true);
-    setShTestMsg("Diagnose läuft (das dauert ~20 Sekunden) …");
-    const B = "https://practice-api.speedhive.com";
-    const pfade = [
-      ["1", B + "/api/v1/activities/" + act],
-      ["2", B + "/api/v1/activities/" + act + "/sessions"],
-      ["3", B + "/api/v1/training/activities/" + act],
-      ["4", B + "/api/v1/training/activities/" + act + "/sessions"],
-      ["5", B + "/api/v2/activities/" + act],
-      ["6", B + "/api/v2/activities/" + act + "/sessions"],
-      ["7", B + "/api/v1/sessions?activityId=" + act],
-      ["8", B + "/api/v1/chips/" + tx + "/sessions"],
-    ];
-    const zeilen = [];
-    for (const [nr, ziel] of pfade) {
-      try {
-        const r = await fetch("https://corsproxy.io/?url=" + encodeURIComponent(ziel), { headers: { Accept: "application/json" } });
-        let extra = "";
-        if (r.ok) {
-          const t = await r.text();
-          extra = " ✅ len=" + t.length + " » " + t.slice(0, 60).replace(/\s+/g, " ");
-        }
-        zeilen.push(nr + ": " + r.status + extra);
-      } catch (e) {
-        zeilen.push(nr + ": BLOCKIERT");
-      }
-    }
-    setShTestMsg("DIAGNOSE v17 (bitte Foto schicken):\n" + zeilen.join("\n"));
-    setShTestBusy(false);
-  };
   if (auto) {
     const gesamt = auto.startAuto + litersFor(fahrten, "autoId", auto.id, null);
     const fvStand = partStand(fahrten, "autoId", auto.id, auto.fv);
@@ -783,13 +758,6 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
               onChange={(e) => setAuto({ transponder: e.target.value })} />
           </Field>
-          <Field label="Aktivitäts-ID (Zahl aus speedhive.mylaps.com/practice/…/activity)">
-            <input inputMode="numeric" placeholder="z. B. 8017814816" className={inputCls} value={auto.activityId || ""}
-              onChange={(e) => setAuto({ activityId: e.target.value.replace(/\D/g, "") })} />
-          </Field>
-          <button onClick={testSpeedhive} disabled={shTestBusy}
-            className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">🔬 Speedhive-Diagnose starten</button>
-          {shTestMsg && <pre className="text-[10px] font-mono text-amber-200 mb-3 whitespace-pre-wrap break-all">{shTestMsg}</pre>}
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -1015,7 +983,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v17</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v19</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
