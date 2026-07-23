@@ -635,6 +635,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                 className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm mb-3 active:bg-slate-800 disabled:opacity-40">
                 📋 Aus Zwischenablage (schnellste Runde suchen)
               </button>
+            </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
               <p className="text-sm font-bold text-amber-200 mb-1">{fmtLap(pendingLap.zeit)} · {fmtDate(pendingLap.datum)} {pendingLap.uhrzeit}</p>
@@ -983,7 +984,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v19</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v20</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
