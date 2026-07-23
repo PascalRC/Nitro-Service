@@ -79,6 +79,8 @@ async function fetchBestLap(transponder) {
   const sessUrls = [
     "https://practice-api.speedhive.com/api/v1/locations/" + locId + "/chips/" + encodeURIComponent(chipCode) + "/sessions",
     "https://practice-api.speedhive.com/api/v1/chips/" + encodeURIComponent(chipCode) + "/locations/" + locId + "/sessions",
+    "https://practice-api.speedhive.com/api/v1/chips/" + encodeURIComponent(chipCode) + "/activities/" + a0.id + "/sessions",
+    "https://practice-api.speedhive.com/api/v1/activities/" + a0.id + "/sessions",
   ];
   for (const su of sessUrls) {
     const sj = await tryFetchJSON(su);
@@ -494,7 +496,27 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapMsg, setLapMsg] = useState("");
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
+  const [manuellOffen, setManuellOffen] = useState(false);
+  const [manZeit, setManZeit] = useState("");
+  const [manDatum, setManDatum] = useState(today());
+  const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
   const montiertesAuto = motor ? autos.find((a) => a.motorId === motor.id) : null;
+  const ermittleWetterUndSetzePending = async (zeit, datum, uhrzeit, ortHint) => {
+    setLapMsg((ortHint ? "" : "") + "Ermittle deinen Standort für die Temperatur …");
+    const standort = await getStandort();
+    let temp = null;
+    let ortName = ortHint || (montiertesAuto && montiertesAuto.ort) || "";
+    if (standort) {
+      temp = await fetchTemperaturVonKoordinaten(standort.lat, standort.lon, datum, uhrzeit);
+      const rg = await reverseGeocode(standort.lat, standort.lon);
+      if (rg) ortName = rg;
+    } else if (montiertesAuto && montiertesAuto.ort) {
+      temp = await fetchTemperature(montiertesAuto.ort, datum, uhrzeit);
+    }
+    setPendingLap({ zeit, datum, uhrzeit, ort: ortName, temperatur: temp });
+    setLapMsg(temp === null ? "⚠️ Temperatur konnte nicht ermittelt werden (Standortzugriff erlaubt? evtl. zu aktuelles Datum)." : "");
+    setLapBusy(false);
+  };
   const holeBestzeit = async () => {
     if (!montiertesAuto || !montiertesAuto.transponder) {
       setLapMsg("Dieser Motor ist in keinem Auto mit Transponder-Nr. montiert (unter 'Autos' eintragen).");
@@ -508,20 +530,15 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
       setLapBusy(false);
       return;
     }
-    setLapMsg("Bestzeit gefunden – ermittle deinen Standort für die Temperatur …");
-    const standort = await getStandort();
-    let temp = null;
-    let ortName = res.ort || montiertesAuto.ort || "";
-    if (standort) {
-      temp = await fetchTemperaturVonKoordinaten(standort.lat, standort.lon, res.datum, res.uhrzeit);
-      const rg = await reverseGeocode(standort.lat, standort.lon);
-      if (rg) ortName = rg;
-    } else if (montiertesAuto.ort) {
-      temp = await fetchTemperature(montiertesAuto.ort, res.datum, res.uhrzeit);
-    }
-    setPendingLap({ zeit: res.zeit, datum: res.datum, uhrzeit: res.uhrzeit, ort: ortName, temperatur: temp });
-    setLapMsg(temp === null ? "⚠️ Temperatur konnte nicht ermittelt werden (Standortzugriff erlaubt? evtl. zu aktuelles Datum)." : "");
-    setLapBusy(false);
+    await ermittleWetterUndSetzePending(res.zeit, res.datum, res.uhrzeit, res.ort);
+  };
+  const uebernehmeManuell = async () => {
+    if (!manZeit.trim()) { setLapMsg("Bitte zuerst eine Zeit eintragen."); return; }
+    setManuellOffen(false);
+    setLapBusy(true);
+    setLapMsg("Übernehme manuelle Zeit …");
+    await ermittleWetterUndSetzePending(manZeit.trim(), manDatum, manUhrzeit, null);
+    setManZeit("");
   };
   const speichereGrip = (grip) => {
     if (!pendingLap) return;
@@ -575,10 +592,38 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           <h4 className="text-sm font-bold text-slate-100 mb-2 mt-2">🏁 Rundenzeiten</h4>
           {lapMsg && <p className="text-xs font-semibold text-amber-200 mb-2">{lapMsg}</p>}
           {!pendingLap ? (
-            <button onClick={holeBestzeit} disabled={lapBusy}
-              className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">
-              📡 Neue Bestzeit von Speedhive holen
-            </button>
+            <>
+              <button onClick={holeBestzeit} disabled={lapBusy}
+                className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm mb-2 active:bg-amber-400/10 disabled:opacity-40">
+                📡 Neue Bestzeit von Speedhive holen
+              </button>
+              {!manuellOffen ? (
+                <button onClick={() => setManuellOffen(true)} disabled={lapBusy}
+                  className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm mb-3 active:bg-slate-800 disabled:opacity-40">
+                  ✏️ Zeit manuell eintragen
+                </button>
+              ) : (
+                <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
+                  <Field label="Zeit (z. B. 12.345 oder 1:02.345)">
+                    <input inputMode="decimal" placeholder="12.345" className={inputCls} value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <label className="text-xs text-slate-400">Datum
+                      <input type="date" className={`${inputCls} mt-1`} value={manDatum} onChange={(e) => setManDatum(e.target.value)} />
+                    </label>
+                    <label className="text-xs text-slate-400">Uhrzeit
+                      <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={uebernehmeManuell} disabled={lapBusy}
+                      className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2 text-sm active:bg-amber-300 disabled:opacity-40">Weiter</button>
+                    <button onClick={() => setManuellOffen(false)}
+                      className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800">Abbrechen</button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
               <p className="text-sm font-bold text-amber-200 mb-1">{fmtLap(pendingLap.zeit)} · {fmtDate(pendingLap.datum)} {pendingLap.uhrzeit}</p>
@@ -967,7 +1012,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v14</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v15</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
