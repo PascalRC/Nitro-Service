@@ -179,23 +179,44 @@ const normalizeData = (d) => {
   const base = seedData();
   const out = { ...base, ...d };
   out.settings = { ...base.settings, ...(d.settings || {}) };
-  out.motoren = (d.motoren || []).map((m) => ({ ...m, kz: m.kz || KZ_DEFAULT() }));
+  const f = d.fahrten || [];
+  const summe = (feld, id, abDatum) => f
+    .filter((x) => x[feld] === id && (!abDatum || x.datum >= abDatum))
+    .reduce((sum, x) => sum + (x.liter || 0), 0);
+  const migPart = (part, feld, id) => {
+    const pt = part || { reset: today(), start: 0 };
+    if (pt.stand !== undefined) return pt;
+    return { ...pt, stand: Math.round(((pt.start || 0) + summe(feld, id, pt.reset)) * 1000) / 1000 };
+  };
+  out.autos = (d.autos || []).map((a) => ({
+    ...a,
+    gesamt: a.gesamt !== undefined ? a.gesamt : Math.round(((a.startAuto || 0) + summe("autoId", a.id, null)) * 1000) / 1000,
+    fv: migPart(a.fv, "autoId", a.id),
+    fg1: migPart(a.fg1, "autoId", a.id),
+  }));
+  out.motoren = (d.motoren || []).map((m) => ({
+    ...m,
+    motor: migPart(m.motor, "motorId", m.id),
+    hl: migPart(m.hl, "motorId", m.id),
+    fl: migPart(m.fl, "motorId", m.id),
+    pl: migPart(m.pl, "motorId", m.id),
+    kz: migPart(m.kz || KZ_DEFAULT(), "motorId", m.id),
+  }));
   return out;
 };
 
 // ---------- Calculations ----------
-const litersFor = (fahrten, field, id, resetDate) =>
-  fahrten.filter((f) => f[field] === id && (!resetDate || f.datum >= resetDate))
-    .reduce((s, f) => s + f.liter, 0);
+// Zaehlerstaende werden gespeichert, NICHT aus der Fahrtenliste berechnet.
+// Loeschen einer Fahrt aus dem Protokoll aendert die Literstaende daher nicht.
+const standOf = (part) => (part && part.stand !== undefined ? part.stand : (part && part.start) || 0);
+const plus = (part, liter) => ({ ...part, stand: Math.round((standOf(part) + liter) * 1000) / 1000 });
 
-const partStand = (fahrten, field, id, part) => part.start + litersFor(fahrten, field, id, part.reset);
-
-const motorStands = (fahrten, m) => ({
-  gesamt: partStand(fahrten, "motorId", m.id, m.motor),
-  hl: partStand(fahrten, "motorId", m.id, m.hl),
-  fl: partStand(fahrten, "motorId", m.id, m.fl),
-  pl: partStand(fahrten, "motorId", m.id, m.pl),
-  kz: partStand(fahrten, "motorId", m.id, m.kz || KZ_DEFAULT()),
+const motorStands = (m) => ({
+  gesamt: standOf(m.motor),
+  hl: standOf(m.hl),
+  fl: standOf(m.fl),
+  pl: standOf(m.pl),
+  kz: standOf(m.kz || KZ_DEFAULT()),
 });
 
 const statusOf = (stand, cfg) => {
@@ -272,7 +293,7 @@ function PartEditor({ title, part, onChange, withNote, stand, cfg, pruefInterval
     <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-slate-100">{title}</span>
-        <button onClick={() => onChange({ ...part, reset: today(), start: 0, checkedAt: 0,
+        <button onClick={() => onChange({ ...part, reset: today(), start: 0, stand: 0, checkedAt: 0,
             history: [...history, { note: part.note || "", liter: stand !== undefined ? Math.round(stand * 10) / 10 : null, bis: today() }] })}
           className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1 active:bg-amber-400/10">Teil getauscht → 0</button>
       </div>
@@ -288,10 +309,11 @@ function PartEditor({ title, part, onChange, withNote, stand, cfg, pruefInterval
         <label className="text-xs text-slate-400">Reset am
           <input type="date" className={`${inputCls} mt-1`} value={part.reset} onChange={(e) => onChange({ ...part, reset: e.target.value })} />
         </label>
-        <label className="text-xs font-bold text-amber-300">Startwert [L]
-          <input inputMode="decimal" className={`${inputCls} mt-1 font-bold`} defaultValue={String(part.start).replace(".", ",")}
-            key={`${part.reset}-${title}`}
-            onBlur={(e) => onChange({ ...part, start: parseNum(e.target.value) })} />
+        <label className="text-xs font-bold text-amber-300">Stand [L]
+          <input inputMode="decimal" className={`${inputCls} mt-1 font-extrabold text-amber-300 text-lg`}
+            defaultValue={String(standOf(part)).replace(".", ",")}
+            key={`${part.reset}-${title}-${standOf(part)}`}
+            onBlur={(e) => onChange({ ...part, stand: parseNum(e.target.value) })} />
         </label>
       </div>
       {withNote && (
@@ -358,16 +380,16 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
       )}
       {shownAutos.map((a) => {
         const motor = motoren.find((m) => m.id === a.motorId);
-        const gesamt = a.startAuto + litersFor(fahrten, "autoId", a.id, null);
+        const gesamt = a.gesamt || 0;
         return (
           <Card key={a.id}>
             <div className="flex items-baseline justify-between">
               <span className="text-xl font-extrabold text-slate-100">{a.name}</span>
-              <span className="text-sm text-slate-400 tabular-nums">{fmt(gesamt)} L gesamt</span>
+              <span className="text-xl font-extrabold text-amber-300 tabular-nums">{fmt(gesamt)} L</span>
             </div>
             <div className="text-sm text-slate-400 mb-2">Motor: {motor ? motor.name : "–"}</div>
-            <TankBar name="Freilauf Vorne" stand={partStand(fahrten, "autoId", a.id, a.fv)} cfg={settings.fv} />
-            <TankBar name="Freilauf Gang 1" stand={partStand(fahrten, "autoId", a.id, a.fg1)} cfg={settings.fg1} />
+            <TankBar name="Freilauf Vorne" stand={standOf(a.fv)} cfg={settings.fv} />
+            <TankBar name="Freilauf Gang 1" stand={standOf(a.fg1)} cfg={settings.fg1} />
           </Card>
         );
       })}
@@ -392,7 +414,7 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
         </Card>
       )}
       {shownMotoren.map((m) => {
-        const s = motorStands(fahrten, m);
+        const s = motorStands(m);
         const kz = m.kz || KZ_DEFAULT();
         const parts = [
           ["Hauptlager", s.hl, settings.hl, m.hl.note], ["Frontlager", s.fl, settings.fl, m.fl.note], ["Pleuel", s.pl, settings.pl, m.pl.note],
@@ -404,11 +426,15 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
           <Card key={m.id}>
             <div className="flex items-baseline justify-between">
               <span className="text-lg font-extrabold text-slate-100">{m.name}</span>
-              <span className="text-sm text-slate-400 tabular-nums">{fmt(s.gesamt)} L</span>
+              <span className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</span>
             </div>
             {parts.map(([n, st, c, note]) => <TankBar key={n} name={n} note={note} stand={st} cfg={c} />)}
             {kzCheck >= 1 && (
-              <div className="mt-1 text-xs font-semibold text-amber-200">🔍 Kerze prüfen – {fmt(kzCheck)} L seit letzter Prüfung (im Motoren-Blatt bestätigen)</div>
+              <div className="mt-2 bg-amber-400/10 border border-amber-400/40 rounded-xl p-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-amber-200">\ud83d\udd0d Kerze pr\u00fcfen \u2013 {fmt(kzCheck)} L seit letzter Pr\u00fcfung</span>
+                <button onClick={() => up((d) => ({ motoren: d.motoren.map((x) => x.id === m.id ? { ...x, kz: { ...(x.kz || KZ_DEFAULT()), checkedAt: s.kz } } : x) }))}
+                  className="shrink-0 text-xs font-bold rounded-full bg-amber-400 text-slate-950 px-3 py-1 active:bg-amber-300">Gepr\u00fcft \u2713</button>
+              </div>
             )}
             <div className="mt-2 text-sm font-semibold text-slate-200">
               {next.rest <= 0 ? "⚠️ JETZT fällig: " : "Nächste Wartung: "}{next.n}
@@ -440,7 +466,24 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
   const add = () => {
     const l = parseNum(liter);
     if (!autoId || !motorId || l <= 0) return;
-    up((d) => ({ fahrten: [...d.fahrten, { id: uid(), datum, autoId, motorId, liter: l, notiz }] }));
+    const uhrzeit = new Date().toTimeString().slice(0, 5);
+    up((d) => ({
+      fahrten: [...d.fahrten, { id: uid(), datum, uhrzeit, autoId, motorId, liter: l, notiz, ts: Date.now() }],
+      autos: d.autos.map((a) => a.id !== autoId ? a : ({
+        ...a,
+        gesamt: Math.round(((a.gesamt || 0) + l) * 1000) / 1000,
+        fv: plus(a.fv, l),
+        fg1: plus(a.fg1, l),
+      })),
+      motoren: d.motoren.map((m) => m.id !== motorId ? m : ({
+        ...m,
+        motor: plus(m.motor, l),
+        hl: plus(m.hl, l),
+        fl: plus(m.fl, l),
+        pl: plus(m.pl, l),
+        kz: plus(m.kz || KZ_DEFAULT(), l),
+      })),
+    }));
     setLiter(""); setNotiz("");
   };
   return (
@@ -471,19 +514,23 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
         <button onClick={add} disabled={parseNum(liter) <= 0}
           className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 disabled:opacity-40 active:bg-amber-300">Fahrt speichern</button>
       </Card>
-      <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Letzte Fahrten</h2>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Fahrten-Protokoll</h2>
+        <span className="text-xs text-slate-400 tabular-nums">{fahrten.length} Einträge</span>
+      </div>
+      <p className="text-[11px] text-slate-400 -mt-2">Nur eine Auflistung. Löschen entfernt den Eintrag aus dieser Liste – die Literstände bleiben unverändert.</p>
       {fahrten.length === 0 && <Card className="text-sm text-slate-400">Noch keine Fahrten – trage oben Deine erste ein.</Card>}
-      {[...fahrten].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 20).map((f) => (
+      {[...fahrten].sort((a, b) => (b.ts || 0) - (a.ts || 0) || String(b.datum).localeCompare(String(a.datum))).map((f) => (
         <Card key={f.id} className="flex items-center justify-between py-3">
           <div>
-            <div className="font-semibold text-slate-100 tabular-nums">{fmtDate(f.datum)} · {fmt(f.liter)} L</div>
+            <div className="font-semibold text-slate-100 tabular-nums">{fmtDate(f.datum)}{f.uhrzeit ? " " + f.uhrzeit : ""} · <span className="text-amber-300 font-extrabold">{fmt(f.liter)} L</span></div>
             <div className="text-xs text-slate-400">
               {autos.find((a) => a.id === f.autoId)?.name || "?"} · {motoren.find((m) => m.id === f.motorId)?.name || "?"}{f.notiz ? ` · ${f.notiz}` : ""}
             </div>
           </div>
-          <ConfirmButton label="Löschen" confirmLabel="Sicher?"
+          <ConfirmButton label="✕" confirmLabel="Nur Eintrag löschen?"
             onConfirm={() => up((d) => ({ fahrten: d.fahrten.filter((x) => x.id !== f.id) }))}
-            className="text-red-400 text-sm font-semibold px-2 py-1 rounded-lg" />
+            className="text-red-400 text-xs font-semibold px-2 py-1 rounded-lg shrink-0" />
         </Card>
       ))}
     </div>
@@ -571,7 +618,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
     setTimeout(() => setLapMsg(""), 3000);
   };
   if (motor) {
-    const s = motorStands(fahrten, motor);
+    const s = motorStands(motor);
     const rundenzeiten = motor.rundenzeiten || [];
     const sortiert = [...rundenzeiten].sort((a, b) => (parseLapSeconds(a.zeit) ?? 9e9) - (parseLapSeconds(b.zeit) ?? 9e9));
     return (
@@ -581,7 +628,10 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           <Field label="Motor-Name">
             <input className={`${inputCls} font-extrabold`} value={motor.name} onChange={(e) => setMotor({ name: e.target.value })} />
           </Field>
-          <div className="text-sm text-slate-300 mb-3 tabular-nums">Gesamt: {fmt(s.gesamt)} L · HL {fmt(s.hl)} L · FL {fmt(s.fl)} L · Pleuel {fmt(s.pl)} L</div>
+          <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl px-3 py-2 mb-3 flex items-baseline justify-between">
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-200">Motor gesamt</span>
+            <span className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</span>
+          </div>
           <PartEditor title="Motor gesamt" part={motor.motor} onChange={(p) => setMotor({ motor: p })} />
           <PartEditor title="Hauptlager" part={motor.hl} onChange={(p) => setMotor({ hl: p })} withNote stand={s.hl} cfg={settings.hl} />
           <PartEditor title="Frontlager" part={motor.fl} onChange={(p) => setMotor({ fl: p })} withNote stand={s.fl} cfg={settings.fl} />
@@ -672,7 +722,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
     <div className="space-y-3">
       {motoren.length === 0 && <Card className="text-sm text-slate-400">Noch kein Motor – lege unten Deinen ersten an.</Card>}
       {motoren.map((m) => {
-        const s = motorStands(fahrten, m);
+        const s = motorStands(m);
         const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl), statusOf(s.kz, settings.kz)]
           .sort((a, b) => a.rest - b.rest)[0];
         const isActive = m.id === activeMotorId;
@@ -683,7 +733,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                 <span className="font-extrabold text-slate-100">{m.name}</span>
                 {isActive && <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Aktiv</span>}
               </div>
-              <div className="text-xs text-slate-400 tabular-nums">{fmt(s.gesamt)} L gesamt</div>
+              <div className="text-base font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</div>
             </button>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[worst.key].chip}`}>{worst.label}</span>
           </Card>
@@ -875,9 +925,9 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
   if (auto) {
-    const gesamt = auto.startAuto + litersFor(fahrten, "autoId", auto.id, null);
-    const fvStand = partStand(fahrten, "autoId", auto.id, auto.fv);
-    const fg1Stand = partStand(fahrten, "autoId", auto.id, auto.fg1);
+    const gesamt = auto.gesamt || 0;
+    const fvStand = standOf(auto.fv);
+    const fg1Stand = standOf(auto.fg1);
     const isActive = auto.id === activeAutoId || (!activeAutoId && autos[0]?.id === auto.id);
     return (
       <div className="space-y-4">
@@ -919,7 +969,7 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
       {autos.length === 0 && <Card className="text-sm text-slate-400">Noch kein Auto – lege unten Dein erstes an.</Card>}
       {autos.map((a) => {
         const isActive = a.id === activeAutoId || (!activeAutoId && autos[0]?.id === a.id);
-        const gesamt = a.startAuto + litersFor(fahrten, "autoId", a.id, null);
+        const gesamt = a.gesamt || 0;
         return (
           <Card key={a.id} className="flex items-center justify-between active:bg-slate-800">
             <button onClick={() => setEditAutoId(a.id)} className="flex-1 text-left">
@@ -1136,7 +1186,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v21</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v22</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
