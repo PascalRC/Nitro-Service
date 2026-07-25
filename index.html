@@ -35,8 +35,9 @@ const dataHash = (d) => {
 };
 const parseLapSeconds = (str) => {
   if (!str) return null;
-  const m = String(str).match(/(?:(\d+):)?(\d+)\.(\d+)/);
-  if (!m) { const n = parseFloat(str); return isNaN(n) ? null : n; }
+  const norm = String(str).replace(",", ".");
+  const m = norm.match(/(?:(\d+):)?(\d+)\.(\d+)/);
+  if (!m) { const n = parseFloat(norm); return isNaN(n) ? null : n; }
   const min = m[1] ? parseInt(m[1], 10) : 0;
   return min * 60 + parseFloat(m[2] + "." + m[3]);
 };
@@ -666,8 +667,8 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           {!pendingLap ? (
             <>
               <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
-                <Field label="Schnellste Rundenzeit">
-                  <input inputMode="decimal" placeholder="z. B. 12.345" className={`${inputCls} text-lg font-bold tabular-nums`}
+                <Field label="Schnellste Rundenzeit (Komma oder Punkt)">
+                  <input inputMode="decimal" placeholder="z. B. 13,760" className={`${inputCls} text-lg font-bold tabular-nums`}
                     value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
                 </Field>
                 <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1186,7 +1187,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v23</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v24</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
