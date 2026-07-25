@@ -725,6 +725,152 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
+
+const TOUR = [
+  { icon: "🏁", titel: "Willkommen bei Nitro Service", text: "Diese App zählt die Laufleistung deiner Autos und Motoren in Litern und warnt dich rechtzeitig, bevor ein Bauteil fällig wird.", demo: "start" },
+  { icon: "🚗", titel: "1. Auto anlegen", text: "Tippe unten auf 'Autos' und dann auf '+ Auto hinzufügen'. Gib ihm einen Namen und wähle später den montierten Motor aus.", demo: "auto" },
+  { icon: "🔧", titel: "2. Motor anlegen", text: "Unter 'Motoren' legst du deine Motoren an – mit Setup-Daten wie Buchse, Kolben, Welle und Vergaser.", demo: "motor" },
+  { icon: "⛽", titel: "3. Jede Fahrt eintragen", text: "Nach dem Fahren unter 'Fahrt' die getankten Liter eintragen. Nutze die Schnelltasten +0,25 / +0,5 / +1 L.", demo: "fahrt" },
+  { icon: "📊", titel: "4. Alles rechnet automatisch", text: "Die Liter zählen automatisch auf alle Bauteile hoch: Freiläufe, Hauptlager, Frontlager, Pleuel und Kerze.", demo: "balken" },
+  { icon: "🚦", titel: "5. Die Ampel im Blick", text: "Grün = alles gut. Gelb = bald fällig. Rot = jetzt wechseln! Das Dashboard zeigt dir immer, was als Nächstes ansteht.", demo: "ampel" },
+  { icon: "♻️", titel: "6. Teil getauscht?", text: "Beim jeweiligen Bauteil auf 'Teil getauscht → 0' tippen. Der Zähler startet neu – und die alte Standzeit landet in der Historie.", demo: "reset" },
+  { icon: "📜", titel: "7. Aus der Historie lernen", text: "Jedes getauschte Teil wird mit Hersteller und gefahrenen Litern gespeichert. So siehst du mit der Zeit, welche Lager am längsten halten.", demo: "historie" },
+  { icon: "🏆", titel: "8. Motoren vergleichen", text: "Trage Durchzug, Topspeed und deine schnellste Rundenzeit ein. Temperatur und Ort holt die App automatisch – du wählst nur den Grip.", demo: "auswertung" },
+  { icon: "💾", titel: "9. Daten sichern", text: "Unter 'Mehr' regelmäßig auf 'Als Datei sichern' tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
+];
+
+function TourDemo({ art }) {
+  const box = "bg-slate-950 border border-slate-700 rounded-xl p-3 text-left";
+  if (art === "balken") {
+    return (
+      <div className={box}>
+        <TankBar name="Hauptlager" note="O.S Lager" stand={1.5} cfg={{ max: 5, gelb: 1 }} />
+        <TankBar name="Frontlager" note="SKF ZZ" stand={4.2} cfg={{ max: 5, gelb: 1 }} />
+        <TankBar name="Kerze" note="RP7" stand={4.6} cfg={{ max: 4, gelb: 1 }} />
+      </div>
+    );
+  }
+  if (art === "ampel") {
+    return (
+      <div className={box + " flex gap-2 justify-center"}>
+        {[["OK", "grün"], ["BALD FÄLLIG", "gelb"], ["FÄLLIG", "rot"]].map(([t, k]) => (
+          <span key={k} className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[k].chip}`}>{t}</span>
+        ))}
+      </div>
+    );
+  }
+  if (art === "fahrt") {
+    return (
+      <div className={box}>
+        <p className="text-xs text-slate-400 mb-1">Laufleistung [L]</p>
+        <div className="rounded-lg border border-slate-600 px-3 py-2 text-slate-100 font-bold mb-2">0,5</div>
+        <div className="flex gap-2">
+          {["+0,25 L", "+0,5 L", "+1 L"].map((t) => (
+            <span key={t} className="flex-1 text-center text-[11px] rounded-lg border border-slate-600 py-1.5 text-slate-300">{t}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (art === "reset") {
+    return (
+      <div className={box + " flex items-center justify-between"}>
+        <span className="font-semibold text-slate-100 text-sm">Hauptlager</span>
+        <span className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1">Teil getauscht → 0</span>
+      </div>
+    );
+  }
+  if (art === "historie") {
+    return (
+      <div className={box}>
+        <p className="text-xs font-bold text-slate-300 mb-1">📜 Historie (2)</p>
+        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2">O.S Lager – 4,8 L · ausgebaut 19.07.2026</p>
+        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2 mt-1">SKF ZZ – 3,2 L · ausgebaut 05.07.2026</p>
+      </div>
+    );
+  }
+  if (art === "auswertung") {
+    return (
+      <div className={box}>
+        <p className="text-sm font-bold text-amber-300 tabular-nums mb-1">🏆 12.345s</p>
+        <p className="text-xs text-slate-400 mb-2">19.07.2026 14:30 · Ettlingen · 24°C · Grip: Hoch</p>
+        <div className="flex gap-2">
+          {["Hoch", "Mittel", "Wenig"].map((g) => (
+            <span key={g} className="flex-1 text-center text-[11px] rounded-lg bg-amber-400 text-slate-950 font-bold py-1.5">{g}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (art === "backup") {
+    return (
+      <div className={box}>
+        <span className="block text-center text-xs font-bold rounded-lg bg-amber-400 text-slate-950 py-2">💾 Als Datei sichern</span>
+        <p className="text-[11px] text-amber-200 mt-2">Letzte Sicherung vor 32 Tagen – jetzt sichern?</p>
+      </div>
+    );
+  }
+  if (art === "auto" || art === "motor" || art === "start") {
+    const tabs = [["📊", "Start"], ["⛽", "Fahrt"], ["🚗", "Autos"], ["🔧", "Motoren"], ["🏁", "Rang"], ["⚙️", "Mehr"]];
+    const aktiv = art === "auto" ? "Autos" : art === "motor" ? "Motoren" : "Start";
+    return (
+      <div className={box + " flex justify-around"}>
+        {tabs.map(([ic, t]) => (
+          <span key={t} className={`flex flex-col items-center text-[10px] font-semibold ${t === aktiv ? "text-amber-300" : "text-slate-500"}`}>
+            <span className="text-lg leading-none">{ic}</span>{t}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
+function TourScreen({ onClose }) {
+  const [i, setI] = useState(0);
+  const [auto, setAuto] = useState(true);
+  useEffect(() => {
+    if (!auto) return;
+    const t = setTimeout(() => {
+      setI((v) => (v + 1 < TOUR.length ? v + 1 : (setAuto(false), v)));
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [i, auto]);
+  const s = TOUR[i];
+  return (
+    <div className="space-y-4">
+      <button onClick={onClose} className="text-amber-300 font-semibold text-sm">← Zurück zu Mehr</button>
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-bold text-slate-400 tabular-nums">Schritt {i + 1} von {TOUR.length}</span>
+          <button onClick={() => setAuto((v) => !v)} className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1">
+            {auto ? "⏸ Pause" : "▶︎ Auto-Play"}
+          </button>
+        </div>
+        <div className="h-1 rounded-full bg-slate-800 overflow-hidden mb-4">
+          <div className="h-full bg-amber-400 rounded-full" style={{ width: ((i + 1) / TOUR.length) * 100 + "%", transition: "width .5s" }} />
+        </div>
+        <div className="text-center mb-3">
+          <div className="text-5xl mb-2">{s.icon}</div>
+          <h3 className="text-lg font-extrabold text-slate-100 mb-1">{s.titel}</h3>
+          <p className="text-sm text-slate-300">{s.text}</p>
+        </div>
+        <TourDemo art={s.demo} />
+        <div className="flex gap-2 mt-4">
+          <button onClick={() => { setAuto(false); setI((v) => Math.max(0, v - 1)); }} disabled={i === 0}
+            className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2.5 text-sm disabled:opacity-30">← Zurück</button>
+          {i + 1 < TOUR.length ? (
+            <button onClick={() => { setAuto(false); setI(i + 1); }}
+              className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300">Weiter →</button>
+          ) : (
+            <button onClick={onClose} className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300">Los geht's! 🏁</button>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
@@ -790,7 +936,7 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   );
 }
 
-function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup }) {
+function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour }) {
   const [showBackup, setShowBackup] = useState(false);
   const [restoreText, setRestoreText] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
@@ -838,6 +984,11 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
   };
   return (
     <div className="space-y-4">
+      <Card>
+        <h3 className="font-bold text-slate-100 mb-1">🎬 Einführung</h3>
+        <p className="text-xs text-slate-400 mb-3">Kurze Tour durch alle Funktionen – läuft automatisch ab.</p>
+        <button onClick={onTour} className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">▶︎ Tour starten</button>
+      </Card>
       <Card>
         <h3 className="font-bold text-slate-100 mb-3">Maximalwerte & Warnungen</h3>
         {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"], ["kz", "Kerze"]].map(([key, label]) => (
@@ -919,6 +1070,7 @@ function App() {
   const [tab, setTab] = useState("start");
   const [editMotorId, setEditMotorId] = useState(null);
   const [editAutoId, setEditAutoId] = useState(null);
+  const [tourOffen, setTourOffen] = useState(false);
   const [saveState, setSaveState] = useState("");
   const saveTimer = useRef(null);
   const loaded = useRef(false);
@@ -984,19 +1136,20 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v20</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v21</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
-        {tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} fullData={data} doBackup={doBackup} />}
-        {tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
-        {tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
-        {tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
+        {tourOffen && <TourScreen onClose={() => setTourOffen(false)} />}
+        {!tourOffen && tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} fullData={data} doBackup={doBackup} />}
+        {!tourOffen && tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
+        {!tourOffen && tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
+        {!tourOffen && tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
           activeMotorId={(autos.find((a) => a.id === data.activeAutoId) || autos[0])?.motorId || null} autos={autos} />}
-        {tab === "rang" && <RanglisteScreen motoren={motoren} />}
-        {tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
+        {!tourOffen && tab === "rang" && <RanglisteScreen motoren={motoren} />}
+        {!tourOffen && tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
           fullData={data} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
-          onResetAll={() => setData(seedData())} />}
+          onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)} />}
       </main>
       <nav className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-700/60 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map(([key, label, icon]) => (
