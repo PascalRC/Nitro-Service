@@ -544,6 +544,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapMsg, setLapMsg] = useState("");
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
+  const [editLapId, setEditLapId] = useState(null);
   const [manZeit, setManZeit] = useState("");
   const [manDatum, setManDatum] = useState(today());
   const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
@@ -689,27 +690,62 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
             </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
-              <p className="text-sm font-bold text-amber-200 mb-1">{fmtLap(pendingLap.zeit)} · {fmtDate(pendingLap.datum)} {pendingLap.uhrzeit}</p>
-              <p className="text-xs text-slate-300 mb-2">{pendingLap.ort || "Ort unbekannt"} · {pendingLap.temperatur !== null && pendingLap.temperatur !== undefined ? Math.round(pendingLap.temperatur) + "°C" : "Temp. unbekannt"}</p>
-              <p className="text-xs font-semibold text-slate-200 mb-2">Wie war der Grip?</p>
+              <p className="text-2xl font-extrabold text-amber-300 tabular-nums mb-1">{fmtLap(pendingLap.zeit)}</p>
+              <p className="text-sm text-slate-200 mb-3">{fmtDate(pendingLap.datum)} {pendingLap.uhrzeit} · {pendingLap.temperatur !== null && pendingLap.temperatur !== undefined ? Math.round(pendingLap.temperatur) + "°C" : "Temp. unbekannt"}</p>
+              <label className="block text-xs text-slate-400 mb-2">Strecke / Ort (änderbar)
+                <input className={`${inputCls} mt-1`} placeholder="z. B. Ettlingen" value={pendingLap.ort || ""}
+                  onChange={(e) => setPendingLap({ ...pendingLap, ort: e.target.value })} />
+              </label>
+              <label className="block text-xs text-slate-400 mb-3">Notiz (optional)
+                <input className={`${inputCls} mt-1`} placeholder="z. B. neue Reifen, Regen" value={pendingLap.notiz || ""}
+                  onChange={(e) => setPendingLap({ ...pendingLap, notiz: e.target.value })} />
+              </label>
+              <p className="text-sm font-semibold text-slate-100 mb-2">Wie war der Grip?</p>
               <div className="flex gap-2">
                 {["Hoch", "Mittel", "Wenig"].map((g) => (
                   <button key={g} onClick={() => speichereGrip(g)}
-                    className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2 text-sm active:bg-amber-300">{g}</button>
+                    className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300">{g}</button>
                 ))}
               </div>
             </div>
           )}
           {sortiert.length === 0 && !pendingLap && <p className="text-xs text-slate-400">Noch keine Rundenzeiten erfasst.</p>}
           {sortiert.map((r, i) => (
-            <div key={r.id} className={`flex items-center justify-between py-2 ${i > 0 ? "border-t border-slate-700/60" : ""}`}>
-              <div>
-                <div className={`text-sm font-bold tabular-nums ${i === 0 ? "text-amber-300" : "text-slate-100"}`}>{i === 0 ? "🏆 " : ""}{fmtLap(r.zeit)}</div>
-                <div className="text-xs text-slate-400">{fmtDate(r.datum)} {r.uhrzeit} · {r.ort || "?"} · {r.temperatur !== null && r.temperatur !== undefined ? Math.round(r.temperatur) + "°C" : "–"} · Grip: {r.grip}</div>
+            <div key={r.id} className={`py-3 ${i > 0 ? "border-t border-slate-700/60" : ""}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className={`text-xl font-extrabold tabular-nums ${i === 0 ? "text-amber-300" : "text-slate-100"}`}>{i === 0 ? "🏆 " : ""}{fmtLap(r.zeit)}</div>
+                  <div className="text-sm text-slate-300">{fmtDate(r.datum)} {r.uhrzeit} · {r.temperatur !== null && r.temperatur !== undefined ? Math.round(r.temperatur) + "°C" : "–"} · Grip: {r.grip}</div>
+                  <div className="text-sm text-slate-300">{r.ort || "Ort unbekannt"}{r.notiz ? " · " + r.notiz : ""}</div>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button onClick={() => setEditLapId(editLapId === r.id ? null : r.id)}
+                    className="text-xs font-semibold text-amber-300 px-2 py-1">✏️</button>
+                  <ConfirmButton label="✕" confirmLabel="Sicher?"
+                    onConfirm={() => setMotor({ rundenzeiten: rundenzeiten.filter((x) => x.id !== r.id) })}
+                    className="text-red-400 text-xs font-semibold px-2 py-1 rounded-lg" />
+                </div>
               </div>
-              <ConfirmButton label="✕" confirmLabel="Sicher?"
-                onConfirm={() => setMotor({ rundenzeiten: rundenzeiten.filter((x) => x.id !== r.id) })}
-                className="text-red-400 text-xs font-semibold px-2 py-1 rounded-lg shrink-0" />
+              {editLapId === r.id && (
+                <div className="mt-2 border border-slate-700/60 rounded-xl p-3">
+                  <label className="block text-xs text-slate-400 mb-2">Strecke / Ort
+                    <input className={`${inputCls} mt-1`} placeholder="z. B. Ettlingen" value={r.ort || ""}
+                      onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, ort: e.target.value } : x) })} />
+                  </label>
+                  <label className="block text-xs text-slate-400 mb-2">Notiz
+                    <input className={`${inputCls} mt-1`} placeholder="z. B. neue Reifen" value={r.notiz || ""}
+                      onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, notiz: e.target.value } : x) })} />
+                  </label>
+                  <label className="block text-xs text-slate-400 mb-2">Grip
+                    <select className={`${inputCls} mt-1`} value={r.grip || ""}
+                      onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, grip: e.target.value } : x) })}>
+                      {["Hoch", "Mittel", "Wenig"].map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </label>
+                  <button onClick={() => setEditLapId(null)}
+                    className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-2 text-sm active:bg-amber-300">Fertig</button>
+                </div>
+              )}
             </div>
           ))}
         </Card>
@@ -750,239 +786,52 @@ function RanglisteScreen({ motoren }) {
   const rangliste = motoren
     .map((m) => {
       const rz = m.rundenzeiten || [];
-      const beste = rz.reduce((min, r) => {
-        const s = parseLapSeconds(r.zeit);
-        return s !== null && (min === null || s < min) ? s : min;
-      }, null);
-      return { m, ts: parseNum(m.topspeed), dz: parseNum(m.durchzug), beste };
+      let beste = null;
+      for (const r of rz) {
+        const sek = parseLapSeconds(r.zeit);
+        if (sek !== null && (beste === null || sek < parseLapSeconds(beste.zeit))) beste = r;
+      }
+      return { m, ts: parseNum(m.topspeed), dz: parseNum(m.durchzug), beste, anzahl: rz.length };
     })
-    .sort((a, b) => b.ts - a.ts || b.dz - a.dz);
+    .sort((a, b) => {
+      const sa = a.beste ? parseLapSeconds(a.beste.zeit) : null;
+      const sb = b.beste ? parseLapSeconds(b.beste.zeit) : null;
+      if (sa !== null && sb !== null && sa !== sb) return sa - sb;
+      if (sa !== null && sb === null) return -1;
+      if (sa === null && sb !== null) return 1;
+      return b.ts - a.ts || b.dz - a.dz;
+    });
   return (
     <div className="space-y-3">
       {rangliste.length === 0 && <Card className="text-sm text-slate-400">Noch keine Motoren angelegt.</Card>}
       {rangliste.map((r, i) => (
-        <Card key={r.m.id} className="flex items-center gap-3">
-          <span className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold ${i === 0 ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-300"}`}>{i + 1}</span>
-          <div className="flex-1">
-            <div className="font-bold text-slate-100">{r.m.name}</div>
-            <div className="text-xs text-slate-400 tabular-nums">
-              Topspeed {r.m.topspeed ? `${r.m.topspeed} km/h` : "–"} · Durchzug {r.m.durchzug ? `${r.m.durchzug} km/h` : "–"} · 🏁 {r.beste !== null ? fmtLap(String(r.beste)) : "–"}
+        <Card key={r.m.id}>
+          <div className="flex items-center gap-3 mb-2">
+            <span className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg font-extrabold ${i === 0 ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-300"}`}>{i + 1}</span>
+            <div className="flex-1">
+              <div className="text-lg font-extrabold text-slate-100">{r.m.name}</div>
+              {r.beste ? (
+                <div className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmtLap(r.beste.zeit)}</div>
+              ) : (
+                <div className="text-sm text-slate-400">Noch keine Rundenzeit</div>
+              )}
             </div>
+          </div>
+          {r.beste && (
+            <div className="text-sm text-slate-300 space-y-0.5 mb-2">
+              <div>📅 {fmtDate(r.beste.datum)}{r.beste.uhrzeit ? " · " + r.beste.uhrzeit : ""}</div>
+              <div>📍 {r.beste.ort || "Ort unbekannt"} · 🌡️ {r.beste.temperatur !== null && r.beste.temperatur !== undefined ? Math.round(r.beste.temperatur) + "°C" : "–"}</div>
+              <div>🚦 Grip: {r.beste.grip || "–"}{r.anzahl > 1 ? ` · ${r.anzahl} Zeiten erfasst` : ""}</div>
+              {r.beste.notiz && <div className="text-slate-400">📝 {r.beste.notiz}</div>}
+            </div>
+          )}
+          <div className="text-sm text-slate-300 border-t border-slate-700/60 pt-2 tabular-nums">
+            Topspeed <span className="font-bold text-slate-100">{r.m.topspeed ? r.m.topspeed + " km/h" : "–"}</span>
+            {"  ·  "}Durchzug <span className="font-bold text-slate-100">{r.m.durchzug ? r.m.durchzug + " km/h" : "–"}</span>
           </div>
         </Card>
       ))}
-      <p className="text-xs text-slate-400 px-1">Sortiert nach Topspeed, dann Durchzug. Die Bestzeit (🏁) wird zusätzlich angezeigt, sobald Du im Motoren-Blatt eine Rundenzeit erfasst hast.</p>
-    </div>
-  );
-}
-
-
-const TOUR = [
-  { icon: "🏁", titel: "Willkommen bei Nitro Service", text: "Diese App zählt die Laufleistung deiner Autos und Motoren in Litern und warnt dich rechtzeitig, bevor ein Bauteil fällig wird.", demo: "start" },
-  { icon: "🚗", titel: "1. Auto anlegen", text: "Tippe unten auf 'Autos' und dann auf '+ Auto hinzufügen'. Gib ihm einen Namen und wähle später den montierten Motor aus.", demo: "auto" },
-  { icon: "🔧", titel: "2. Motor anlegen", text: "Unter 'Motoren' legst du deine Motoren an – mit Setup-Daten wie Buchse, Kolben, Welle und Vergaser.", demo: "motor" },
-  { icon: "⛽", titel: "3. Jede Fahrt eintragen", text: "Nach dem Fahren unter 'Fahrt' die getankten Liter eintragen. Nutze die Schnelltasten +0,25 / +0,5 / +1 L.", demo: "fahrt" },
-  { icon: "📊", titel: "4. Alles rechnet automatisch", text: "Die Liter zählen automatisch auf alle Bauteile hoch: Freiläufe, Hauptlager, Frontlager, Pleuel und Kerze.", demo: "balken" },
-  { icon: "🚦", titel: "5. Die Ampel im Blick", text: "Grün = alles gut. Gelb = bald fällig. Rot = jetzt wechseln! Das Dashboard zeigt dir immer, was als Nächstes ansteht.", demo: "ampel" },
-  { icon: "♻️", titel: "6. Teil getauscht?", text: "Beim jeweiligen Bauteil auf 'Teil getauscht → 0' tippen. Der Zähler startet neu – und die alte Standzeit landet in der Historie.", demo: "reset" },
-  { icon: "📜", titel: "7. Aus der Historie lernen", text: "Jedes getauschte Teil wird mit Hersteller und gefahrenen Litern gespeichert. So siehst du mit der Zeit, welche Lager am längsten halten.", demo: "historie" },
-  { icon: "🏆", titel: "8. Motoren vergleichen", text: "Trage Durchzug, Topspeed und deine schnellste Rundenzeit ein. Temperatur und Ort holt die App automatisch – du wählst nur den Grip.", demo: "auswertung" },
-  { icon: "💾", titel: "9. Daten sichern", text: "Unter 'Mehr' regelmäßig auf 'Als Datei sichern' tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
-];
-
-function TourDemo({ art }) {
-  const box = "bg-slate-950 border border-slate-700 rounded-xl p-3 text-left";
-  if (art === "balken") {
-    return (
-      <div className={box}>
-        <TankBar name="Hauptlager" note="O.S Lager" stand={1.5} cfg={{ max: 5, gelb: 1 }} />
-        <TankBar name="Frontlager" note="SKF ZZ" stand={4.2} cfg={{ max: 5, gelb: 1 }} />
-        <TankBar name="Kerze" note="RP7" stand={4.6} cfg={{ max: 4, gelb: 1 }} />
-      </div>
-    );
-  }
-  if (art === "ampel") {
-    return (
-      <div className={box + " flex gap-2 justify-center"}>
-        {[["OK", "grün"], ["BALD FÄLLIG", "gelb"], ["FÄLLIG", "rot"]].map(([t, k]) => (
-          <span key={k} className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[k].chip}`}>{t}</span>
-        ))}
-      </div>
-    );
-  }
-  if (art === "fahrt") {
-    return (
-      <div className={box}>
-        <p className="text-xs text-slate-400 mb-1">Laufleistung [L]</p>
-        <div className="rounded-lg border border-slate-600 px-3 py-2 text-slate-100 font-bold mb-2">0,5</div>
-        <div className="flex gap-2">
-          {["+0,25 L", "+0,5 L", "+1 L"].map((t) => (
-            <span key={t} className="flex-1 text-center text-[11px] rounded-lg border border-slate-600 py-1.5 text-slate-300">{t}</span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (art === "reset") {
-    return (
-      <div className={box + " flex items-center justify-between"}>
-        <span className="font-semibold text-slate-100 text-sm">Hauptlager</span>
-        <span className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1">Teil getauscht → 0</span>
-      </div>
-    );
-  }
-  if (art === "historie") {
-    return (
-      <div className={box}>
-        <p className="text-xs font-bold text-slate-300 mb-1">📜 Historie (2)</p>
-        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2">O.S Lager – 4,8 L · ausgebaut 19.07.2026</p>
-        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2 mt-1">SKF ZZ – 3,2 L · ausgebaut 05.07.2026</p>
-      </div>
-    );
-  }
-  if (art === "auswertung") {
-    return (
-      <div className={box}>
-        <p className="text-sm font-bold text-amber-300 tabular-nums mb-1">🏆 12.345s</p>
-        <p className="text-xs text-slate-400 mb-2">19.07.2026 14:30 · Ettlingen · 24°C · Grip: Hoch</p>
-        <div className="flex gap-2">
-          {["Hoch", "Mittel", "Wenig"].map((g) => (
-            <span key={g} className="flex-1 text-center text-[11px] rounded-lg bg-amber-400 text-slate-950 font-bold py-1.5">{g}</span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (art === "backup") {
-    return (
-      <div className={box}>
-        <span className="block text-center text-xs font-bold rounded-lg bg-amber-400 text-slate-950 py-2">💾 Als Datei sichern</span>
-        <p className="text-[11px] text-amber-200 mt-2">Letzte Sicherung vor 32 Tagen – jetzt sichern?</p>
-      </div>
-    );
-  }
-  if (art === "auto" || art === "motor" || art === "start") {
-    const tabs = [["📊", "Start"], ["⛽", "Fahrt"], ["🚗", "Autos"], ["🔧", "Motoren"], ["🏁", "Rang"], ["⚙️", "Mehr"]];
-    const aktiv = art === "auto" ? "Autos" : art === "motor" ? "Motoren" : "Start";
-    return (
-      <div className={box + " flex justify-around"}>
-        {tabs.map(([ic, t]) => (
-          <span key={t} className={`flex flex-col items-center text-[10px] font-semibold ${t === aktiv ? "text-amber-300" : "text-slate-500"}`}>
-            <span className="text-lg leading-none">{ic}</span>{t}
-          </span>
-        ))}
-      </div>
-    );
-  }
-  return null;
-}
-
-function TourScreen({ onClose }) {
-  const [i, setI] = useState(0);
-  const [auto, setAuto] = useState(true);
-  useEffect(() => {
-    if (!auto) return;
-    const t = setTimeout(() => {
-      setI((v) => (v + 1 < TOUR.length ? v + 1 : (setAuto(false), v)));
-    }, 6000);
-    return () => clearTimeout(t);
-  }, [i, auto]);
-  const s = TOUR[i];
-  return (
-    <div className="space-y-4">
-      <button onClick={onClose} className="text-amber-300 font-semibold text-sm">← Zurück zu Mehr</button>
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-slate-400 tabular-nums">Schritt {i + 1} von {TOUR.length}</span>
-          <button onClick={() => setAuto((v) => !v)} className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1">
-            {auto ? "⏸ Pause" : "▶︎ Auto-Play"}
-          </button>
-        </div>
-        <div className="h-1 rounded-full bg-slate-800 overflow-hidden mb-4">
-          <div className="h-full bg-amber-400 rounded-full" style={{ width: ((i + 1) / TOUR.length) * 100 + "%", transition: "width .5s" }} />
-        </div>
-        <div className="text-center mb-3">
-          <div className="text-5xl mb-2">{s.icon}</div>
-          <h3 className="text-lg font-extrabold text-slate-100 mb-1">{s.titel}</h3>
-          <p className="text-sm text-slate-300">{s.text}</p>
-        </div>
-        <TourDemo art={s.demo} />
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => { setAuto(false); setI((v) => Math.max(0, v - 1)); }} disabled={i === 0}
-            className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2.5 text-sm disabled:opacity-30">← Zurück</button>
-          {i + 1 < TOUR.length ? (
-            <button onClick={() => { setAuto(false); setI(i + 1); }}
-              className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300">Weiter →</button>
-          ) : (
-            <button onClick={onClose} className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300">Los geht's! 🏁</button>
-          )}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
-  const auto = autos.find((a) => a.id === editAutoId);
-  const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
-  if (auto) {
-    const gesamt = auto.gesamt || 0;
-    const fvStand = standOf(auto.fv);
-    const fg1Stand = standOf(auto.fg1);
-    const isActive = auto.id === activeAutoId || (!activeAutoId && autos[0]?.id === auto.id);
-    return (
-      <div className="space-y-4">
-        <button onClick={() => setEditAutoId(null)} className="text-amber-300 font-semibold text-sm">← Zurück zur Liste</button>
-        <Card>
-          <Field label="Auto-Name">
-            <input className={`${inputCls} font-extrabold`} value={auto.name} onChange={(e) => setAuto({ name: e.target.value })} />
-          </Field>
-          <div className="mb-3 flex items-center justify-between">
-            {isActive ? (
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300">✓ Aktiv im Dashboard</span>
-            ) : (
-              <button onClick={() => up({ activeAutoId: auto.id })}
-                className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1 active:bg-amber-400/10">Als aktiv setzen</button>
-            )}
-            <span className="text-sm text-slate-400 tabular-nums">{fmt(gesamt)} L gesamt</span>
-          </div>
-          <Field label="Montierter Motor">
-            <select className={inputCls} value={auto.motorId || ""} onChange={(e) => setAuto({ motorId: e.target.value })}>
-              <option value="">– kein Motor –</option>
-              {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Transponder-Nr. (Speedhive)">
-            <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
-              onChange={(e) => setAuto({ transponder: e.target.value })} />
-          </Field>
-          <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(p) => setAuto({ fv: p })} stand={fvStand} cfg={settings.fv} />
-          <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(p) => setAuto({ fg1: p })} stand={fg1Stand} cfg={settings.fg1} />
-        </Card>
-        <ConfirmButton label="Auto löschen" confirmLabel="Wirklich löschen? Nochmal tippen"
-          onConfirm={() => { up((d) => ({ autos: d.autos.filter((a) => a.id !== editAutoId) })); setEditAutoId(null); }}
-          className="w-full rounded-xl border border-red-500/50 text-red-400 font-bold py-3" />
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-3">
-      {autos.length === 0 && <Card className="text-sm text-slate-400">Noch kein Auto – lege unten Dein erstes an.</Card>}
-      {autos.map((a) => {
-        const isActive = a.id === activeAutoId || (!activeAutoId && autos[0]?.id === a.id);
-        const gesamt = a.gesamt || 0;
-        return (
-          <Card key={a.id} className="flex items-center justify-between active:bg-slate-800">
-            <button onClick={() => setEditAutoId(a.id)} className="flex-1 text-left">
-              <div className="font-extrabold text-slate-100">{a.name}</div>
-              <div className="text-xs text-slate-400 tabular-nums">{fmt(gesamt)} L gesamt · Motor: {motoren.find((m) => m.id === a.motorId)?.name || "–"}</div>
-            </button>
-            {isActive && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300">Aktiv</span>}
-          </Card>
-        );
-      })}
-      <button onClick={() => { const id = uid(); up((d) => ({ activeAutoId: d.activeAutoId || id, autos: [...d.autos, { id, name: "Neues Auto", motorId: d.motoren[0]?.id || "", startAuto: 0, fv: { reset: today(), start: 0 }, fg1: { reset: today(), start: 0 } }] })); setEditAutoId(id); }}
-        className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3">+ Auto hinzufügen</button>
+      <p className="text-xs text-slate-400 px-1">Sortiert nach schnellster Rundenzeit. Motoren ohne Zeit stehen hinten und werden nach Topspeed/Durchzug gereiht.</p>
     </div>
   );
 }
@@ -1187,7 +1036,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v24</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v25</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
