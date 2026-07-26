@@ -529,9 +529,9 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
               {autos.find((a) => a.id === f.autoId)?.name || "?"} · {motoren.find((m) => m.id === f.motorId)?.name || "?"}{f.notiz ? ` · ${f.notiz}` : ""}
             </div>
           </div>
-          <ConfirmButton label="✕" confirmLabel="Nur Eintrag löschen?"
+          <ConfirmButton label="🗑" confirmLabel="Nur Eintrag löschen?"
             onConfirm={() => up((d) => ({ fahrten: d.fahrten.filter((x) => x.id !== f.id) }))}
-            className="text-red-400 text-xs font-semibold px-2 py-1 rounded-lg shrink-0" />
+            className="rounded-xl border border-red-500/50 text-red-400 text-sm font-bold px-4 py-2 shrink-0 ml-2" />
         </Card>
       ))}
     </div>
@@ -718,12 +718,12 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                   <div className="text-sm text-slate-300">{fmtDate(r.datum)} {r.uhrzeit} · {r.temperatur !== null && r.temperatur !== undefined ? Math.round(r.temperatur) + "°C" : "–"} · Grip: {r.grip}</div>
                   <div className="text-sm text-slate-300">{r.ort || "Ort unbekannt"}{r.notiz ? " · " + r.notiz : ""}</div>
                 </div>
-                <div className="flex flex-col gap-1 shrink-0">
+                <div className="flex flex-col gap-2 shrink-0 ml-2">
                   <button onClick={() => setEditLapId(editLapId === r.id ? null : r.id)}
-                    className="text-xs font-semibold text-amber-300 px-2 py-1">✏️</button>
-                  <ConfirmButton label="✕" confirmLabel="Sicher?"
+                    className="rounded-xl border border-amber-400 text-amber-300 text-sm font-bold px-4 py-2 active:bg-amber-400/10">✏️ Ändern</button>
+                  <ConfirmButton label="🗑 Löschen" confirmLabel="Sicher?"
                     onConfirm={() => setMotor({ rundenzeiten: rundenzeiten.filter((x) => x.id !== r.id) })}
-                    className="text-red-400 text-xs font-semibold px-2 py-1 rounded-lg" />
+                    className="rounded-xl border border-red-500/50 text-red-400 text-sm font-bold px-4 py-2" />
                 </div>
               </div>
               {editLapId === r.id && (
@@ -1036,7 +1036,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v25</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v26</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
