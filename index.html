@@ -545,6 +545,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
   const [editLapId, setEditLapId] = useState(null);
+  const [manLink, setManLink] = useState("");
   const [manZeit, setManZeit] = useState("");
   const [manDatum, setManDatum] = useState(today());
   const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
@@ -561,7 +562,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
     } else if (montiertesAuto && montiertesAuto.ort) {
       temp = await fetchTemperature(montiertesAuto.ort, datum, uhrzeit);
     }
-    setPendingLap({ zeit, datum, uhrzeit, ort: ortName, temperatur: temp });
+    setPendingLap({ zeit, datum, uhrzeit, ort: ortName, temperatur: temp, link: manLink || "" });
     setLapMsg(temp === null ? "⚠️ Temperatur konnte nicht ermittelt werden (Standortzugriff erlaubt? evtl. zu aktuelles Datum)." : "");
     setLapBusy(false);
   };
@@ -598,11 +599,18 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const ausZwischenablage = async () => {
     try {
       const text = await navigator.clipboard.readText();
+      const linkTreffer = String(text).match(/https?:\/\/\S*speedhive\S*/);
       const beste = findeSchnellste(text);
       if (!beste) {
-        setLapMsg("In der Zwischenablage wurde keine Rundenzeit gefunden. Kopiere die Session-Ansicht aus Speedhive und versuch es nochmal.");
+        if (linkTreffer) {
+          setManLink(linkTreffer[0]);
+          setLapMsg("Speedhive-Link übernommen. Trage die Zeit oben ein – der Link wird mitgespeichert.");
+        } else {
+          setLapMsg("In der Zwischenablage wurde keine Rundenzeit gefunden.");
+        }
         return;
       }
+      if (linkTreffer) setManLink(linkTreffer[0]);
       const gefunden = (String(text).match(/\b(?:\d+:)?\d{1,2}[.,]\d{2,3}\b/g) || []).length;
       setLapBusy(true);
       setLapMsg("Schnellste von " + gefunden + " gefundenen Zeiten: " + beste.roh + " – ermittle Standort …");
@@ -616,6 +624,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
     const entry = { id: uid(), ...pendingLap, grip };
     setMotor({ rundenzeiten: [...(motor.rundenzeiten || []), entry] });
     setPendingLap(null);
+    setManLink("");
     setLapMsg("✓ Bestzeit gespeichert!");
     setTimeout(() => setLapMsg(""), 3000);
   };
@@ -680,6 +689,10 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                     <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
                   </label>
                 </div>
+                <label className="block text-xs text-slate-400 mb-3">Speedhive-Link (optional)
+                  <input className={`${inputCls} mt-1 text-xs`} placeholder="https://speedhive.mylaps.com/practice/…"
+                    value={manLink} onChange={(e) => setManLink(e.target.value)} />
+                </label>
                 <button onClick={uebernehmeManuell} disabled={lapBusy || !manZeit.trim()}
                   className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300 disabled:opacity-40">Weiter zu Grip & Temperatur</button>
               </div>
@@ -717,6 +730,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                   <div className={`text-xl font-extrabold tabular-nums ${i === 0 ? "text-amber-300" : "text-slate-100"}`}>{i === 0 ? "🏆 " : ""}{fmtLap(r.zeit)}</div>
                   <div className="text-sm text-slate-300">{fmtDate(r.datum)} {r.uhrzeit} · {r.temperatur !== null && r.temperatur !== undefined ? Math.round(r.temperatur) + "°C" : "–"} · Grip: {r.grip}</div>
                   <div className="text-sm text-slate-300">{r.ort || "Ort unbekannt"}{r.notiz ? " · " + r.notiz : ""}</div>
+                  {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-sm font-semibold text-amber-300 underline">🔗 Session in Speedhive öffnen</a>}
                 </div>
                 <div className="flex flex-col gap-2 shrink-0 ml-2">
                   <button onClick={() => setEditLapId(editLapId === r.id ? null : r.id)}
@@ -981,6 +995,32 @@ function TourScreen({ onClose }) {
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
+  const [diagMsg, setDiagMsg] = useState("");
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diagId, setDiagId] = useState("8017814816");
+  const diagnose = async () => {
+    setDiagBusy(true);
+    setDiagMsg("Prüfe Serverantworten …");
+    const B = "https://practice-api.speedhive.com";
+    const ziele = [
+      ["T1", B + "/api/v1/training/activities/" + diagId],
+      ["T2", B + "/api/v1/training/activities/" + diagId + "/sessions"],
+      ["T3", B + "/api/v2/training/activities/" + diagId],
+      ["T4", B + "/api/v1/training/activities/" + diagId + "/laps"],
+    ];
+    const zeilen = [];
+    for (const [nr, ziel] of ziele) {
+      try {
+        const r = await fetch("https://corsproxy.io/?url=" + encodeURIComponent(ziel), { headers: { Accept: "application/json" } });
+        const t = (await r.text()).slice(0, 220).replace(/\s+/g, " ");
+        zeilen.push(nr + " [" + r.status + "] " + t);
+      } catch (e) {
+        zeilen.push(nr + " BLOCKIERT");
+      }
+    }
+    setDiagMsg("ANTWORTEN (bitte Foto schicken):\n" + zeilen.join("\n\n"));
+    setDiagBusy(false);
+  };
   if (auto) {
     const gesamt = auto.gesamt || 0;
     const fvStand = standOf(auto.fv);
@@ -1020,6 +1060,13 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
               value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
           </Field>
+          <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
+            <p className="text-xs font-bold text-slate-300 mb-2">🔬 Speedhive-Test (nur zur Fehlersuche)</p>
+            <input inputMode="numeric" placeholder="Aktivitäts-ID" className={`${inputCls} mb-2`} value={diagId} onChange={(e) => setDiagId(e.target.value.replace(/\D/g, ""))} />
+            <button onClick={diagnose} disabled={diagBusy}
+              className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800 disabled:opacity-40">Serverantwort prüfen</button>
+            {diagMsg && <pre className="text-[10px] font-mono text-amber-200 mt-2 whitespace-pre-wrap break-all">{diagMsg}</pre>}
+          </div>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(pp) => setAuto({ fg1: pp })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -1254,7 +1301,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v28</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v29</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
