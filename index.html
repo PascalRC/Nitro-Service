@@ -62,19 +62,32 @@ async function tryFetchJSON(url) {
   return null;
 }
 function findeArrays(obj, tiefe) {
-  // sucht rekursiv nach Arrays mit Objekten, die bestLap enthalten
+  // sucht rekursiv nach Arrays, deren Eintraege wie Sessions aussehen
   const out = [];
-  if (!obj || typeof obj !== "object" || (tiefe || 0) > 4) return out;
+  if (!obj || typeof obj !== "object" || (tiefe || 0) > 6) return out;
+  const wieSession = (e) => e && typeof e === "object" && (
+    e.bestLap || e.BestLap || e.starttimeutc || e.startTimeUtc || e.start || e.startTime || e.sessionNr || e.sessionId
+  );
   for (const k of Object.keys(obj)) {
     const v = obj[k];
     if (Array.isArray(v)) {
-      if (v.length && typeof v[0] === "object" && v[0] && (v[0].bestLap || v[0].BestLap)) out.push(v);
+      if (v.length && v.some(wieSession)) out.push(v);
       for (const el of v) out.push(...findeArrays(el, (tiefe || 0) + 1));
     } else if (v && typeof v === "object") {
       out.push(...findeArrays(v, (tiefe || 0) + 1));
     }
   }
   return out;
+}
+
+function zeitstempelVon(e) {
+  if (!e) return 0;
+  const roh = e.starttimeutc || e.startTimeUtc || e.starttime || e.start || e.startTime;
+  if (!roh) return 0;
+  const n = Number(roh);
+  if (!isNaN(n) && n > 0) return n;
+  const p = Date.parse(roh);
+  return isNaN(p) ? 0 : p;
 }
 
 function sammleAktivitaeten(act) {
@@ -169,19 +182,22 @@ async function speedhiveAbruf(worker, auto, modus) {
     const bl = sess.bestLap || sess.BestLap || {};
     const dauer = bl.duration || bl.Duration || (sess.stats && (sess.stats.fastestTime || sess.stats.FastestTime));
     if (!dauer) throw new Error("keine Tageszeit gefunden");
-    // Uhrzeit aus der Session holen, in der die schnellste Runde gefahren wurde
-    const sid = bl.sessionId || bl.SessionId;
-    let treffer = null;
+    const sid = bl.sessionId !== undefined ? bl.sessionId : bl.SessionId;
+    let perId = null, perZeit = null;
     for (const arr of arraysAlle) {
       for (const e of arr) {
+        if (!e || typeof e !== "object") continue;
+        if (sid !== undefined && sid !== null) {
+          const ids = [e.id, e.sessionId, e.sessionNr, e.number, e.nr];
+          if (ids.some((x) => x !== undefined && String(x) === String(sid))) perId = perId || e;
+        }
         const ebl = e.bestLap || e.BestLap || {};
-        const gleicheZeit = String(ebl.duration || ebl.Duration || "") === String(dauer);
-        const gleicheId = sid !== undefined && (String(e.id) === String(sid) || String(e.sessionId) === String(sid));
-        if (gleicheId || (!treffer && gleicheZeit)) treffer = e;
+        if (String(ebl.duration || ebl.Duration || "") === String(dauer)) perZeit = perZeit || e;
       }
     }
+    const treffer = perId || perZeit;
     if (treffer) {
-      const ts = Number(treffer.starttimeutc || treffer.startTimeUtc || treffer.start || 0) || (treffer.startTime ? Date.parse(treffer.startTime) : 0);
+      const ts = zeitstempelVon(treffer);
       if (ts > 0) { const u = utcZuDatum(ts); datum = u.datum; uhrzeit = u.uhrzeit; }
     }
     return { zeit: String(dauer), datum, uhrzeit, ort, quelle: "Tag", neueId: zielId };
@@ -191,7 +207,9 @@ async function speedhiveAbruf(worker, auto, modus) {
   let letzte = null, letzteTs = -1;
   for (const arr of arrays) {
     for (const e of arr) {
-      const ts = Number(e.starttimeutc || e.startTimeUtc || e.start || 0) || (e.startTime ? Date.parse(e.startTime) : 0);
+      const bl = e && (e.bestLap || e.BestLap);
+      if (!bl || !(bl.duration || bl.Duration)) continue;
+      const ts = zeitstempelVon(e);
       if (ts >= letzteTs) { letzteTs = ts; letzte = e; }
     }
   }
@@ -200,7 +218,7 @@ async function speedhiveAbruf(worker, auto, modus) {
   const dauer2 = bl2.duration || bl2.Duration;
   if (!dauer2) throw new Error("keine Session-Zeit gefunden");
   if (letzteTs > 0) {
-    const u = utcZuDatum(letzteTs > 1e12 ? letzteTs / 1000 : letzteTs);
+    const u = utcZuDatum(letzteTs);
     if (u.datum) { datum = u.datum; uhrzeit = u.uhrzeit; }
   }
   return { zeit: String(dauer2), datum, uhrzeit, ort, quelle: "letzte Session", neueId: zielId };
@@ -973,8 +991,9 @@ const TOUR = [
   { icon: "🚦", titel: "5. Die Ampel im Blick", text: "Grün = alles gut. Gelb = bald fällig. Rot = jetzt wechseln! Das Dashboard zeigt dir immer, was als Nächstes ansteht.", demo: "ampel" },
   { icon: "♻️", titel: "6. Teil getauscht?", text: "Beim jeweiligen Bauteil auf 'Teil getauscht' tippen. Der Zähler startet neu – und die alte Standzeit landet in der Historie.", demo: "reset" },
   { icon: "📜", titel: "7. Aus der Historie lernen", text: "Jedes getauschte Teil wird mit Hersteller und gefahrenen Litern gespeichert. So siehst du mit der Zeit, welche Lager am längsten halten.", demo: "historie" },
-  { icon: "🏆", titel: "8. Motoren vergleichen", text: "Trage Durchzug, Topspeed und deine schnellste Rundenzeit ein. Temperatur und Ort holt die App automatisch – du wählst nur den Grip.", demo: "auswertung" },
-  { icon: "💾", titel: "9. Daten sichern", text: "Unter 'Mehr' regelmäßig auf 'Als Datei sichern' tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
+  { icon: "🔗", titel: "8. Speedhive verknüpfen", text: "Einmalig pro Auto: Speedhive-App öffnen, eine Session teilen, Link kopieren – dann unter 'Autos' auf 'Jetzt verknüpfen' und einfügen. Danach nie wieder nötig.", demo: "verknuepfen" },
+  { icon: "🏆", titel: "9. Motoren vergleichen", text: "Bei 'Motoren' holst du mit einem Tipp die schnellste Runde des Tages oder der letzten Session. Temperatur und Ort kommen automatisch – du wählst nur den Grip.", demo: "auswertung" },
+  { icon: "💾", titel: "10. Daten sichern", text: "Unter 'Mehr' regelmäßig auf 'Als Datei sichern' tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
 ];
 
 function TourDemo({ art }) {
@@ -1037,6 +1056,14 @@ function TourDemo({ art }) {
             <span key={g} className="flex-1 text-center text-[11px] rounded-lg bg-amber-400 text-slate-950 font-bold py-1.5">{g}</span>
           ))}
         </div>
+      </div>
+    );
+  }
+  if (art === "verknuepfen") {
+    return (
+      <div className={box}>
+        <p className="text-sm font-bold text-emerald-300 mb-2">✓ Verknüpft (Nr. 8017814816)</p>
+        <span className="block text-center text-xs font-bold rounded-lg border border-amber-400 text-amber-300 py-2">Verknüpfung ändern</span>
       </div>
     );
   }
@@ -1146,10 +1173,6 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
               onChange={(e) => setAuto({ transponder: e.target.value })} />
           </Field>
-          <Field label="Notizen zum Auto">
-            <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
-              value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
-          </Field>
           <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
             <p className="text-xs font-bold text-slate-300 mb-2">🔗 Speedhive-Verknüpfung</p>
             {!idBearbeiten ? (
@@ -1182,6 +1205,10 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
               </>
             )}
           </div>
+          <Field label="Notizen zum Auto">
+            <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
+              value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
+          </Field>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(pp) => setAuto({ fg1: pp })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -1416,7 +1443,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v35</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v36</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
