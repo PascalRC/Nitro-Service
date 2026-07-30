@@ -209,6 +209,10 @@ const normalizeData = (d) => {
 // ---------- Calculations ----------
 // Zaehlerstaende werden gespeichert, NICHT aus der Fahrtenliste berechnet.
 // Loeschen einer Fahrt aus dem Protokoll aendert die Literstaende daher nicht.
+const WORKER_STANDARD = "https://speedhive.pascalsass.workers.dev/";
+const workerUrl = (d) => (d && d.workerUrl) || WORKER_STANDARD;
+const viaWorker = (worker, ziel) => worker.replace(/\/+$/, "/") + "?url=" + encodeURIComponent(ziel);
+
 const standOf = (part) => (part && part.stand !== undefined ? part.stand : (part && part.start) || 0);
 const plus = (part, liter) => ({ ...part, stand: Math.round((standOf(part) + liter) * 1000) / 1000 });
 
@@ -1000,29 +1004,42 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   const [diagId, setDiagId] = useState("8017814816");
   const diagnose = async () => {
     setDiagBusy(true);
-    setDiagMsg("Teste 8 Zwischendienste …");
-    const ziel = "https://practice-api.speedhive.com/api/v1/training/activities/" + diagId;
-    const dienste = [
-      ["allorigins", "https://api.allorigins.win/raw?url=" + encodeURIComponent(ziel)],
-      ["codetabs", "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(ziel)],
-      ["corsproxy", "https://corsproxy.io/?url=" + encodeURIComponent(ziel)],
-      ["cors.lol", "https://api.cors.lol/?url=" + encodeURIComponent(ziel)],
-      ["thingproxy", "https://thingproxy.freeboard.io/fetch/" + ziel],
-      ["cors.eu", "https://cors.eu.org/" + ziel],
-      ["workers", "https://test.cors.workers.dev/?" + ziel],
-      ["whatever", "https://whateverorigin.org/get?url=" + encodeURIComponent(ziel)],
-    ];
+    setDiagMsg("Erkunde Datenstruktur über deinen Worker …");
+    const W = WORKER_STANDARD;
+    const B = "https://practice-api.speedhive.com/api/v1/training";
     const zeilen = [];
-    for (const [nm, u] of dienste) {
-      try {
-        const r = await fetch(u, { headers: { Accept: "application/json" } });
-        const t = (await r.text()).slice(0, 90).replace(/\s+/g, " ");
-        zeilen.push(nm + " [" + r.status + "] " + t);
-      } catch (e) {
-        zeilen.push(nm + " BLOCKIERT");
+    let sessionId = null;
+    try {
+      const r0 = await fetch(viaWorker(W, B + "/activities/" + diagId));
+      const j0 = await r0.json();
+      zeilen.push("AKTIVITÄT [" + r0.status + "] Keys: " + Object.keys(j0).join(","));
+      const dto = j0.practiceSessionsDto || j0.PracticeSessionsDto;
+      if (dto) {
+        zeilen.push("DTO-Keys: " + Object.keys(dto).join(","));
+        const liste = dto.sessions || dto.Sessions || dto.practiceSessions || [];
+        zeilen.push("Sessions: " + liste.length);
+        if (liste.length) {
+          sessionId = liste[0].id;
+          zeilen.push("Session-Keys: " + Object.keys(liste[0]).join(","));
+          zeilen.push("Session0: " + JSON.stringify(liste[0]).slice(0, 200));
+        }
       }
+    } catch (e) { zeilen.push("Aktivität Fehler: " + String(e).slice(0, 80)); }
+
+    const kandidaten = sessionId ? [
+      ["S1", B + "/activities/" + diagId + "/sessions"],
+      ["S2", B + "/sessions/" + sessionId + "/laps"],
+      ["S3", B + "/sessions/" + sessionId],
+      ["S4", B + "/activities/" + diagId + "/sessions/" + sessionId + "/laps"],
+    ] : [["S1", B + "/activities/" + diagId + "/sessions"]];
+    for (const [nm, u] of kandidaten) {
+      try {
+        const r = await fetch(viaWorker(W, u));
+        const t = (await r.text()).slice(0, 180).replace(/\s+/g, " ");
+        zeilen.push(nm + " [" + r.status + "] " + t);
+      } catch (e) { zeilen.push(nm + " Fehler"); }
     }
-    setDiagMsg("ERGEBNIS (Foto schicken):\n" + zeilen.join("\n"));
+    setDiagMsg("STRUKTUR (Foto schicken):\n" + zeilen.join("\n\n"));
     setDiagBusy(false);
   };
   if (auto) {
@@ -1068,7 +1085,7 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <p className="text-xs font-bold text-slate-300 mb-2">🔬 Speedhive-Test (nur zur Fehlersuche)</p>
             <input inputMode="numeric" placeholder="Aktivitäts-ID" className={`${inputCls} mb-2`} value={diagId} onChange={(e) => setDiagId(e.target.value.replace(/\D/g, ""))} />
             <button onClick={diagnose} disabled={diagBusy}
-              className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800 disabled:opacity-40">8 Dienste testen</button>
+              className="w-full rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800 disabled:opacity-40">Datenstruktur erkunden</button>
             {diagMsg && <pre className="text-[10px] font-mono text-amber-200 mt-2 whitespace-pre-wrap break-all">{diagMsg}</pre>}
           </div>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
@@ -1305,7 +1322,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v30</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v31</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
