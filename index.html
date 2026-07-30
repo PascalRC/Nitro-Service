@@ -98,9 +98,15 @@ function sammleAktivitaeten(act) {
 }
 
 const utcZuDatum = (ts) => {
-  const ms = Number(ts) > 1e14 ? Number(ts) / 1000 : Number(ts) * 1000;
+  const n = Number(ts);
+  const ms = n > 1e14 ? n / 1000 : (n > 1e11 ? n : n * 1000);
   const d = new Date(ms);
-  return { datum: d.toISOString().slice(0, 10), uhrzeit: d.toTimeString().slice(0, 5), ms };
+  const zz = (x) => String(x).padStart(2, "0");
+  return {
+    datum: d.getFullYear() + "-" + zz(d.getMonth() + 1) + "-" + zz(d.getDate()),
+    uhrzeit: zz(d.getHours()) + ":" + zz(d.getMinutes()),
+    ms,
+  };
 };
 
 async function speedhiveAbruf(worker, auto, modus) {
@@ -157,14 +163,31 @@ async function speedhiveAbruf(worker, auto, modus) {
   if (!datum && besteTs) { const u = utcZuDatum(besteTs); datum = u.datum; uhrzeit = u.uhrzeit; }
   const ort = (detail.location && (detail.location.name || detail.location.Name)) || "";
 
+  const arraysAlle = findeArrays(sess, 0);
+
   if (modus === "tag") {
     const bl = sess.bestLap || sess.BestLap || {};
     const dauer = bl.duration || bl.Duration || (sess.stats && (sess.stats.fastestTime || sess.stats.FastestTime));
     if (!dauer) throw new Error("keine Tageszeit gefunden");
+    // Uhrzeit aus der Session holen, in der die schnellste Runde gefahren wurde
+    const sid = bl.sessionId || bl.SessionId;
+    let treffer = null;
+    for (const arr of arraysAlle) {
+      for (const e of arr) {
+        const ebl = e.bestLap || e.BestLap || {};
+        const gleicheZeit = String(ebl.duration || ebl.Duration || "") === String(dauer);
+        const gleicheId = sid !== undefined && (String(e.id) === String(sid) || String(e.sessionId) === String(sid));
+        if (gleicheId || (!treffer && gleicheZeit)) treffer = e;
+      }
+    }
+    if (treffer) {
+      const ts = Number(treffer.starttimeutc || treffer.startTimeUtc || treffer.start || 0) || (treffer.startTime ? Date.parse(treffer.startTime) : 0);
+      if (ts > 0) { const u = utcZuDatum(ts); datum = u.datum; uhrzeit = u.uhrzeit; }
+    }
     return { zeit: String(dauer), datum, uhrzeit, ort, quelle: "Tag", neueId: zielId };
   }
 
-  const arrays = findeArrays(sess, 0);
+  const arrays = arraysAlle;
   let letzte = null, letzteTs = -1;
   for (const arr of arrays) {
     for (const e of arr) {
@@ -652,7 +675,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   };
   const holeVonSpeedhive = async (modus) => {
     if (!montiertesAuto || (!montiertesAuto.transponder && !montiertesAuto.activityId)) {
-      setLapMsg("Bitte beim Auto die Transponder-Nr. eintragen.");
+      setLapMsg("Bitte das Auto zuerst unter 'Autos' mit Speedhive verknüpfen.");
       return;
     }
     setLapBusy(true);
@@ -665,7 +688,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
       setLapMsg("Gefunden (" + res.quelle + "): " + res.zeit + " – ermittle Temperatur …");
       await ermittleWetterUndSetzePending(res.zeit, res.datum, res.uhrzeit, res.ort);
     } catch (e) {
-      setLapMsg("❌ Abruf fehlgeschlagen (" + String(e.message || e).slice(0, 60) + "). Trage die Zeit unten manuell ein.");
+      setLapMsg("❌ Abruf fehlgeschlagen. Ist das Auto unter 'Autos' mit Speedhive verknüpft? Sonst die Zeit oben manuell eintragen.");
       setLapBusy(false);
     }
   };
@@ -1086,7 +1109,8 @@ function TourScreen({ onClose }) {
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
-  const [erweitert, setErweitert] = useState(false);
+  const [idBearbeiten, setIdBearbeiten] = useState(false);
+  const [idEingabe, setIdEingabe] = useState("");
   if (auto) {
     const gesamt = auto.gesamt || 0;
     const fvStand = standOf(auto.fv);
@@ -1126,15 +1150,36 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
               value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
           </Field>
-          <div className="mb-3">
-            <button onClick={() => setErweitert(!erweitert)} className="text-xs font-semibold text-slate-400 active:text-amber-300">
-              ⚙️ Erweitert {erweitert ? "▲" : "▼"}
-            </button>
-            {erweitert && (
-              <label className="block text-xs text-slate-400 mt-2">Speedhive Aktivitäts-ID (wird automatisch gefüllt)
-                <input inputMode="numeric" placeholder="wird automatisch ermittelt" className={`${inputCls} mt-1`} value={auto.activityId || ""}
-                  onChange={(e) => setAuto({ activityId: e.target.value.replace(/\D/g, "") })} />
-              </label>
+          <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
+            <p className="text-xs font-bold text-slate-300 mb-2">🔗 Speedhive-Verknüpfung</p>
+            {!idBearbeiten ? (
+              <>
+                {auto.activityId ? (
+                  <p className="text-sm font-bold text-emerald-300 mb-2">✓ Verknüpft (Nr. {auto.activityId})</p>
+                ) : (
+                  <p className="text-sm font-bold text-amber-300 mb-2">⚠️ Noch nicht verknüpft – einmalig einrichten</p>
+                )}
+                <button onClick={() => { setIdEingabe(auto.activityId || ""); setIdBearbeiten(true); }}
+                  className="w-full rounded-xl border border-amber-400 text-amber-300 font-bold py-2 text-sm active:bg-amber-400/10">
+                  {auto.activityId ? "Verknüpfung ändern" : "Jetzt verknüpfen"}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] text-slate-400 mb-2">Speedhive-App öffnen → eine deiner Sessions → Teilen → Link kopieren → hier einfügen. Die App holt sich die Nummer selbst.</p>
+                <input placeholder="Link einfügen oder Nummer eintippen" className={`${inputCls} mb-2`} value={idEingabe}
+                  onChange={(e) => setIdEingabe(e.target.value)} />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                      const treffer = String(idEingabe).match(/practice\/(\d{6,})/) || String(idEingabe).match(/(\d{6,})/);
+                      if (treffer) { setAuto({ activityId: treffer[1] }); setIdBearbeiten(false); }
+                      else { setIdEingabe(""); }
+                    }}
+                    className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2 text-sm active:bg-amber-300">Speichern</button>
+                  <button onClick={() => setIdBearbeiten(false)}
+                    className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2 text-sm active:bg-slate-800">Abbrechen</button>
+                </div>
+              </>
             )}
           </div>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
@@ -1371,7 +1416,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v33</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v35</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
