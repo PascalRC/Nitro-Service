@@ -993,15 +993,19 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
           <Field label="Auto-Name">
             <input className={`${inputCls} font-extrabold`} value={auto.name} onChange={(e) => setAuto({ name: e.target.value })} />
           </Field>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             {isActive ? (
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300">✓ Aktiv im Dashboard</span>
             ) : (
               <button onClick={() => up({ activeAutoId: auto.id })}
                 className="text-xs font-bold text-amber-300 border border-amber-400 rounded-full px-3 py-1 active:bg-amber-400/10">Als aktiv setzen</button>
             )}
-            <span className="text-xl font-extrabold text-amber-300 tabular-nums">{fmt(gesamt)} L</span>
           </div>
+          <Field label="Gesamtlaufleistung [L] – anpassbar, z. B. bei gebrauchtem Auto">
+            <input inputMode="decimal" className={`${inputCls} text-2xl font-extrabold text-amber-300 tabular-nums`}
+              key={`gesamt-${auto.id}-${gesamt}`} defaultValue={String(gesamt).replace(".", ",")}
+              onBlur={(e) => setAuto({ gesamt: parseNum(e.target.value) })} />
+          </Field>
           <Field label="Montierter Motor">
             <select className={inputCls} value={auto.motorId || ""} onChange={(e) => setAuto({ motorId: e.target.value })}>
               <option value="">– kein Motor –</option>
@@ -1011,6 +1015,10 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
           <Field label="Transponder-Nr. (Speedhive)">
             <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
               onChange={(e) => setAuto({ transponder: e.target.value })} />
+          </Field>
+          <Field label="Notizen zum Auto">
+            <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
+              value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
           </Field>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(pp) => setAuto({ fg1: pp })} stand={fg1Stand} cfg={settings.fg1} />
@@ -1246,7 +1254,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v27</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v28</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
