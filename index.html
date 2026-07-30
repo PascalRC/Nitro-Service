@@ -103,23 +103,52 @@ const utcZuDatum = (ts) => {
   return { datum: d.toISOString().slice(0, 10), uhrzeit: d.toTimeString().slice(0, 5), ms };
 };
 
-async function speedhiveAbruf(worker, startId, modus) {
+async function speedhiveAbruf(worker, auto, modus) {
   const B = "https://practice-api.speedhive.com/api/v1/training";
   const hole = async (u) => {
     const r = await fetch(viaWorker(worker, u), { headers: { Accept: "application/json" } });
     if (!r.ok) throw new Error("Status " + r.status);
     return await r.json();
   };
+  const tx = String(auto.transponder || "").trim();
+  const gespeichert = String(auto.activityId || "").trim();
 
-  // Schritt 1: Einstieg laden und neueste Aktivitaet bestimmen
-  const erste = await hole(B + "/activities/" + startId);
+  // Schritt 1: Einstiegs-Aktivitaet finden - erst per Transponder, sonst gespeicherte ID
+  let erste = null;
+  if (tx) {
+    const suchen = [
+      B + "/activities?chipCode=" + encodeURIComponent(tx) + "&count=5",
+      B + "/chips/" + encodeURIComponent(tx) + "/activities?count=5",
+      "https://practice-api.speedhive.com/api/v1/chips/" + encodeURIComponent(tx) + "/activities?count=5",
+    ];
+    for (const u of suchen) {
+      try {
+        const j = await hole(u);
+        const liste = (j && (j.activities || j.items || j.data)) || (Array.isArray(j) ? j : []);
+        if (liste && liste.length) {
+          let neu = liste[0];
+          for (const a of liste) {
+            const t1 = Date.parse(a.startTime || a.start || 0) || Number(a.starttimeutc || 0);
+            const t0 = Date.parse(neu.startTime || neu.start || 0) || Number(neu.starttimeutc || 0);
+            if (t1 > t0) neu = a;
+          }
+          if (neu && neu.id) { erste = await hole(B + "/activities/" + neu.id); break; }
+        }
+      } catch (e) { /* naechster Versuch */ }
+    }
+  }
+  if (!erste) {
+    if (!gespeichert) throw new Error("keine Aktivitaet gefunden - bitte einmalig eine Speedhive-Adresse hinterlegen");
+    erste = await hole(B + "/activities/" + gespeichert);
+  }
+
+  // Schritt 2: neueste Aktivitaet aus der Liste bestimmen
   const alle = sammleAktivitaeten(erste);
-  let zielId = startId;
+  let zielId = erste.id || gespeichert;
   let besteTs = 0;
   for (const a of alle) if (a.ts > besteTs) { besteTs = a.ts; zielId = a.id; }
 
-  // Schritt 2: Details und Sessions der neuesten Aktivitaet
-  const detail = String(zielId) === String(startId) ? erste : await hole(B + "/activities/" + zielId);
+  const detail = String(zielId) === String(erste.id) ? erste : await hole(B + "/activities/" + zielId);
   const sess = await hole(B + "/activities/" + zielId + "/sessions");
 
   const wann = detail.startTime || detail.StartTime || "";
@@ -132,10 +161,9 @@ async function speedhiveAbruf(worker, startId, modus) {
     const bl = sess.bestLap || sess.BestLap || {};
     const dauer = bl.duration || bl.Duration || (sess.stats && (sess.stats.fastestTime || sess.stats.FastestTime));
     if (!dauer) throw new Error("keine Tageszeit gefunden");
-    return { zeit: String(dauer), datum, uhrzeit, ort, quelle: "Tag" };
+    return { zeit: String(dauer), datum, uhrzeit, ort, quelle: "Tag", neueId: zielId };
   }
 
-  // Letzte Session: das Array mit bestLap-Einträgen suchen, jüngsten Eintrag nehmen
   const arrays = findeArrays(sess, 0);
   let letzte = null, letzteTs = -1;
   for (const arr of arrays) {
@@ -152,7 +180,7 @@ async function speedhiveAbruf(worker, startId, modus) {
     const u = utcZuDatum(letzteTs > 1e12 ? letzteTs / 1000 : letzteTs);
     if (u.datum) { datum = u.datum; uhrzeit = u.uhrzeit; }
   }
-  return { zeit: String(dauer2), datum, uhrzeit, ort, quelle: "letzte Session" };
+  return { zeit: String(dauer2), datum, uhrzeit, ort, quelle: "letzte Session", neueId: zielId };
 }
 
 function getStandort() {
@@ -623,14 +651,17 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
     setLapBusy(false);
   };
   const holeVonSpeedhive = async (modus) => {
-    if (!montiertesAuto || !montiertesAuto.activityId) {
-      setLapMsg("Bitte beim Auto einmalig eine Speedhive-Aktivitäts-ID eintragen (Zahl aus der Adresse einer Session).");
+    if (!montiertesAuto || (!montiertesAuto.transponder && !montiertesAuto.activityId)) {
+      setLapMsg("Bitte beim Auto die Transponder-Nr. eintragen.");
       return;
     }
     setLapBusy(true);
     setLapMsg(modus === "tag" ? "Hole schnellste Runde des Tages …" : "Hole schnellste Runde der letzten Session …");
     try {
-      const res = await speedhiveAbruf(WORKER_STANDARD, montiertesAuto.activityId, modus);
+      const res = await speedhiveAbruf(WORKER_STANDARD, montiertesAuto, modus);
+      if (res.neueId && String(res.neueId) !== String(montiertesAuto.activityId || "")) {
+        up((d) => ({ autos: d.autos.map((a) => a.id === montiertesAuto.id ? { ...a, activityId: String(res.neueId) } : a) }));
+      }
       setLapMsg("Gefunden (" + res.quelle + "): " + res.zeit + " – ermittle Temperatur …");
       await ermittleWetterUndSetzePending(res.zeit, res.datum, res.uhrzeit, res.ort);
     } catch (e) {
@@ -1055,6 +1086,7 @@ function TourScreen({ onClose }) {
 function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, editAutoId, setEditAutoId }) {
   const auto = autos.find((a) => a.id === editAutoId);
   const setAuto = (patch) => up((d) => ({ autos: d.autos.map((a) => (a.id === editAutoId ? { ...a, ...patch } : a)) }));
+  const [erweitert, setErweitert] = useState(false);
   if (auto) {
     const gesamt = auto.gesamt || 0;
     const fvStand = standOf(auto.fv);
@@ -1090,14 +1122,21 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <input inputMode="numeric" placeholder="z. B. 1234567" className={inputCls} value={auto.transponder || ""}
               onChange={(e) => setAuto({ transponder: e.target.value })} />
           </Field>
-          <Field label="Speedhive Aktivitäts-ID (Zahl aus speedhive.mylaps.com/practice/…/activity)">
-            <input inputMode="numeric" placeholder="z. B. 8017814816" className={inputCls} value={auto.activityId || ""}
-              onChange={(e) => setAuto({ activityId: e.target.value.replace(/\D/g, "") })} />
-          </Field>
           <Field label="Notizen zum Auto">
             <textarea rows={5} placeholder="z. B. Setup, Reifen, Federn, Diff-Öl, Umbauten …" className={inputCls}
               value={auto.notizen || ""} onChange={(e) => setAuto({ notizen: e.target.value })} />
           </Field>
+          <div className="mb-3">
+            <button onClick={() => setErweitert(!erweitert)} className="text-xs font-semibold text-slate-400 active:text-amber-300">
+              ⚙️ Erweitert {erweitert ? "▲" : "▼"}
+            </button>
+            {erweitert && (
+              <label className="block text-xs text-slate-400 mt-2">Speedhive Aktivitäts-ID (wird automatisch gefüllt)
+                <input inputMode="numeric" placeholder="wird automatisch ermittelt" className={`${inputCls} mt-1`} value={auto.activityId || ""}
+                  onChange={(e) => setAuto({ activityId: e.target.value.replace(/\D/g, "") })} />
+              </label>
+            )}
+          </div>
           <PartEditor title="Freilauf Vorne" part={auto.fv} onChange={(pp) => setAuto({ fv: pp })} stand={fvStand} cfg={settings.fv} />
           <PartEditor title="Freilauf Gang 1" part={auto.fg1} onChange={(pp) => setAuto({ fg1: pp })} stand={fg1Stand} cfg={settings.fg1} />
         </Card>
@@ -1332,7 +1371,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v32</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v33</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
