@@ -670,6 +670,31 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
   const [editLapId, setEditLapId] = useState(null);
+  const [rohdaten, setRohdaten] = useState("");
+  const zeigeRohdaten = async () => {
+    if (!montiertesAuto || !montiertesAuto.activityId) { setRohdaten("Kein verknüpftes Auto."); return; }
+    setLapBusy(true);
+    setRohdaten("Lade …");
+    try {
+      const B = "https://practice-api.speedhive.com/api/v1/training";
+      const r = await fetch(viaWorker(WORKER_STANDARD, B + "/activities/" + montiertesAuto.activityId + "/sessions"), { headers: { Accept: "application/json" } });
+      const j = await r.json();
+      const zeilen = ["Antwort-Keys: " + Object.keys(j).join(",")];
+      const arrs = findeArrays(j, 0);
+      zeilen.push("Gefundene Listen: " + arrs.length);
+      for (const k of Object.keys(j)) {
+        if (Array.isArray(j[k])) {
+          zeilen.push("Liste '" + k + "' (" + j[k].length + ") erstes Element:");
+          zeilen.push(JSON.stringify(j[k][0]).slice(0, 260));
+        }
+      }
+      if (arrs.length === 0) zeilen.push("ROHTEXT: " + JSON.stringify(j).slice(0, 400));
+      setRohdaten(zeilen.join("\n"));
+    } catch (e) {
+      setRohdaten("Fehler: " + String(e).slice(0, 100));
+    }
+    setLapBusy(false);
+  };
   const [manLink, setManLink] = useState("");
   const [manZeit, setManZeit] = useState("");
   const [manDatum, setManDatum] = useState(today());
@@ -831,7 +856,12 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                 <button onClick={() => holeVonSpeedhive("session")} disabled={lapBusy}
                   className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-3 text-sm active:bg-amber-300 disabled:opacity-40">⏱ Letzte Session</button>
               </div>
-              <p className="text-[11px] text-slate-400 mb-3">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
+              <p className="text-[11px] text-slate-400 mb-2">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
+              <button onClick={zeigeRohdaten} disabled={lapBusy}
+                className="w-full rounded-xl border border-slate-700 text-slate-500 font-semibold py-1.5 text-[11px] mb-3 active:bg-slate-800 disabled:opacity-40">
+                🔬 Rohdaten anzeigen (Fehlersuche)
+              </button>
+              {rohdaten && <pre className="text-[10px] font-mono text-amber-200 mb-3 whitespace-pre-wrap break-all">{rohdaten}</pre>}
             </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
@@ -882,6 +912,16 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                     <input className={`${inputCls} mt-1`} placeholder="z. B. neue Reifen" value={r.notiz || ""}
                       onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, notiz: e.target.value } : x) })} />
                   </label>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <label className="text-xs text-slate-400">Datum
+                      <input type="date" className={`${inputCls} mt-1`} value={r.datum || ""}
+                        onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, datum: e.target.value } : x) })} />
+                    </label>
+                    <label className="text-xs text-slate-400">Uhrzeit
+                      <input type="time" className={`${inputCls} mt-1`} value={r.uhrzeit || ""}
+                        onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, uhrzeit: e.target.value } : x) })} />
+                    </label>
+                  </div>
                   <label className="block text-xs text-slate-400 mb-2">Grip
                     <select className={`${inputCls} mt-1`} value={r.grip || ""}
                       onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, grip: e.target.value } : x) })}>
@@ -1443,7 +1483,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v36</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v37</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
