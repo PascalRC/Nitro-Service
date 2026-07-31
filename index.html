@@ -80,9 +80,25 @@ function findeArrays(obj, tiefe) {
   return out;
 }
 
+function datumUhrzeitVon(e) {
+  // Nimmt die Zeit genau so, wie Speedhive sie liefert (inkl. deren Zeitzone),
+  // damit die Anzeige mit der Speedhive-App uebereinstimmt.
+  if (!e) return null;
+  const roh = e.dateTimeStart || e.datetimestart || e.DateTimeStart
+    || e.starttimeutc || e.startTimeUtc || e.starttime || e.start || e.startTime;
+  if (!roh) return null;
+  const txt = String(roh);
+  const m = txt.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  if (m) return { datum: m[1], uhrzeit: m[2] };
+  const n = Number(roh);
+  if (!isNaN(n) && n > 0) { const u = utcZuDatum(n); return { datum: u.datum, uhrzeit: u.uhrzeit }; }
+  return null;
+}
+
 function zeitstempelVon(e) {
   if (!e) return 0;
-  const roh = e.starttimeutc || e.startTimeUtc || e.starttime || e.start || e.startTime;
+  const roh = e.dateTimeStart || e.datetimestart || e.DateTimeStart
+    || e.starttimeutc || e.startTimeUtc || e.starttime || e.start || e.startTime;
   if (!roh) return 0;
   const n = Number(roh);
   if (!isNaN(n) && n > 0) return n;
@@ -197,8 +213,8 @@ async function speedhiveAbruf(worker, auto, modus) {
     }
     const treffer = perId || perZeit;
     if (treffer) {
-      const ts = zeitstempelVon(treffer);
-      if (ts > 0) { const u = utcZuDatum(ts); datum = u.datum; uhrzeit = u.uhrzeit; }
+      const du = datumUhrzeitVon(treffer);
+      if (du) { datum = du.datum; uhrzeit = du.uhrzeit; }
     }
     return { zeit: String(dauer), datum, uhrzeit, ort, quelle: "Tag", neueId: zielId };
   }
@@ -217,10 +233,8 @@ async function speedhiveAbruf(worker, auto, modus) {
   const bl2 = letzte.bestLap || letzte.BestLap || {};
   const dauer2 = bl2.duration || bl2.Duration;
   if (!dauer2) throw new Error("keine Session-Zeit gefunden");
-  if (letzteTs > 0) {
-    const u = utcZuDatum(letzteTs);
-    if (u.datum) { datum = u.datum; uhrzeit = u.uhrzeit; }
-  }
+  const duL = datumUhrzeitVon(letzte);
+  if (duL) { datum = duL.datum; uhrzeit = duL.uhrzeit; }
   return { zeit: String(dauer2), datum, uhrzeit, ort, quelle: "letzte Session", neueId: zielId };
 }
 
@@ -670,35 +684,6 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
   const [editLapId, setEditLapId] = useState(null);
-  const [rohdaten, setRohdaten] = useState("");
-  const zeigeRohdaten = async () => {
-    if (!montiertesAuto || !montiertesAuto.activityId) { setRohdaten("Kein verknüpftes Auto."); return; }
-    setLapBusy(true);
-    setRohdaten("Lade …");
-    try {
-      const B = "https://practice-api.speedhive.com/api/v1/training";
-      const r = await fetch(viaWorker(WORKER_STANDARD, B + "/activities/" + montiertesAuto.activityId + "/sessions"), { headers: { Accept: "application/json" } });
-      const j = await r.json();
-      const zeilen = ["Antwort-Keys: " + Object.keys(j).join(",")];
-      const arrs = findeArrays(j, 0);
-      zeilen.push("Gefundene Listen: " + arrs.length);
-      for (const k of Object.keys(j)) {
-        if (Array.isArray(j[k])) {
-          zeilen.push("Liste '" + k + "' (" + j[k].length + ") erstes Element:");
-          zeilen.push(JSON.stringify(j[k][0]).slice(0, 260));
-        }
-      }
-      if (arrs.length === 0) zeilen.push("ROHTEXT: " + JSON.stringify(j).slice(0, 400));
-      setRohdaten(zeilen.join("\n"));
-    } catch (e) {
-      setRohdaten("Fehler: " + String(e).slice(0, 100));
-    }
-    setLapBusy(false);
-  };
-  const [manLink, setManLink] = useState("");
-  const [manZeit, setManZeit] = useState("");
-  const [manDatum, setManDatum] = useState(today());
-  const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
   const montiertesAuto = motor ? autos.find((a) => a.motorId === motor.id) : null;
   const ermittleWetterUndSetzePending = async (zeit, datum, uhrzeit, ortHint) => {
     setLapMsg((ortHint ? "" : "") + "Ermittle deinen Standort für die Temperatur …");
@@ -856,12 +841,8 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
                 <button onClick={() => holeVonSpeedhive("session")} disabled={lapBusy}
                   className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-3 text-sm active:bg-amber-300 disabled:opacity-40">⏱ Letzte Session</button>
               </div>
-              <p className="text-[11px] text-slate-400 mb-2">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
-              <button onClick={zeigeRohdaten} disabled={lapBusy}
-                className="w-full rounded-xl border border-slate-700 text-slate-500 font-semibold py-1.5 text-[11px] mb-3 active:bg-slate-800 disabled:opacity-40">
-                🔬 Rohdaten anzeigen (Fehlersuche)
-              </button>
-              {rohdaten && <pre className="text-[10px] font-mono text-amber-200 mb-3 whitespace-pre-wrap break-all">{rohdaten}</pre>}
+              <p className="text-[11px] text-slate-400 mb-3">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
+
             </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
@@ -1483,7 +1464,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v37</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">v38</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
