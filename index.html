@@ -975,7 +975,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
 }
 
 function RanglisteScreen({ motoren }) {
-  const rangliste = motoren
+  const liste = motoren
     .map((m) => {
       const rz = m.rundenzeiten || [];
       let beste = null;
@@ -986,44 +986,54 @@ function RanglisteScreen({ motoren }) {
       return { m, ts: parseNum(m.topspeed), dz: parseNum(m.durchzug), beste, anzahl: rz.length };
     })
     .sort((a, b) => {
+      // 1. Topspeed, 2. Durchzug, 3. Rundenzeit
+      if (b.ts !== a.ts) return b.ts - a.ts;
+      if (b.dz !== a.dz) return b.dz - a.dz;
       const sa = a.beste ? parseLapSeconds(a.beste.zeit) : null;
       const sb = b.beste ? parseLapSeconds(b.beste.zeit) : null;
-      if (sa !== null && sb !== null && sa !== sb) return sa - sb;
-      if (sa !== null && sb === null) return -1;
-      if (sa === null && sb !== null) return 1;
-      return b.ts - a.ts || b.dz - a.dz;
+      if (sa !== null && sb !== null) return sa - sb;
+      if (sa !== null) return -1;
+      if (sb !== null) return 1;
+      return 0;
     });
   return (
     <div className="space-y-3">
-      {rangliste.length === 0 && <Card className="text-sm text-slate-400">Noch keine Motoren angelegt.</Card>}
-      {rangliste.map((r, i) => (
+      <Card className="py-2">
+        <p className="text-xs text-slate-300">Reihenfolge: <span className="font-bold text-amber-300">1. Topspeed</span> → <span className="font-bold text-amber-300">2. Durchzug</span> → <span className="font-bold text-amber-300">3. Bestzeit</span></p>
+      </Card>
+      {liste.length === 0 && <Card className="text-sm text-slate-400">Noch keine Motoren angelegt.</Card>}
+      {liste.map((r, i) => (
         <Card key={r.m.id}>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-3">
             <span className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg font-extrabold ${i === 0 ? "bg-amber-400 text-slate-950" : "bg-slate-800 text-slate-300"}`}>{i + 1}</span>
             <div className="flex-1">
               <div className="text-lg font-extrabold text-slate-100">{r.m.name}</div>
-              {r.beste ? (
-                <div className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmtLap(r.beste.zeit)}</div>
-              ) : (
-                <div className="text-sm text-slate-400">Noch keine Rundenzeit</div>
-              )}
+              <div className="text-xs text-slate-400">{r.anzahl > 0 ? r.anzahl + " Rundenzeit(en) erfasst" : "keine Rundenzeit"}</div>
             </div>
           </div>
-          {r.beste && (
-            <div className="text-sm text-slate-300 space-y-0.5 mb-2">
-              <div>📅 {fmtDate(r.beste.datum)}{r.beste.uhrzeit ? " · " + r.beste.uhrzeit : ""}</div>
-              <div>📍 {r.beste.ort || "Ort unbekannt"} · 🌡️ {r.beste.temperatur !== null && r.beste.temperatur !== undefined ? Math.round(r.beste.temperatur) + "°C" : "–"}</div>
-              <div>🚦 Grip: {r.beste.grip || "–"}{r.anzahl > 1 ? ` · ${r.anzahl} Zeiten erfasst` : ""}</div>
-              {r.beste.notiz && <div className="text-slate-400">📝 {r.beste.notiz}</div>}
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-amber-200">Topspeed</div>
+              <div className="text-2xl font-extrabold text-amber-300 tabular-nums">{r.m.topspeed ? r.m.topspeed : "–"}<span className="text-sm font-bold"> km/h</span></div>
             </div>
+            <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-amber-200">Durchzug</div>
+              <div className="text-2xl font-extrabold text-amber-300 tabular-nums">{r.m.durchzug ? r.m.durchzug : "–"}<span className="text-sm font-bold"> km/h</span></div>
+            </div>
+          </div>
+          {r.beste ? (
+            <div className="border-t border-slate-700/60 pt-2">
+              <div className="text-base font-extrabold text-slate-100 tabular-nums">🏁 {fmtLap(r.beste.zeit)}</div>
+              <div className="text-sm text-slate-300">{fmtDate(r.beste.datum)}{r.beste.uhrzeit ? " " + r.beste.uhrzeit : ""} · {r.beste.ort || "Ort unbekannt"}</div>
+              <div className="text-sm text-slate-300">🌡️ {r.beste.temperatur !== null && r.beste.temperatur !== undefined ? Math.round(r.beste.temperatur) + "°C" : "–"} · 🚦 Grip: {r.beste.grip || "–"}</div>
+              {r.beste.notiz && <div className="text-sm text-slate-400">📝 {r.beste.notiz}</div>}
+            </div>
+          ) : (
+            <div className="border-t border-slate-700/60 pt-2 text-sm text-slate-400">🏁 Noch keine Rundenzeit erfasst</div>
           )}
-          <div className="text-sm text-slate-300 border-t border-slate-700/60 pt-2 tabular-nums">
-            Topspeed <span className="font-bold text-slate-100">{r.m.topspeed ? r.m.topspeed + " km/h" : "–"}</span>
-            {"  ·  "}Durchzug <span className="font-bold text-slate-100">{r.m.durchzug ? r.m.durchzug + " km/h" : "–"}</span>
-          </div>
         </Card>
       ))}
-      <p className="text-xs text-slate-400 px-1">Sortiert nach schnellster Rundenzeit. Motoren ohne Zeit stehen hinten und werden nach Topspeed/Durchzug gereiht.</p>
+      <p className="text-xs text-slate-400 px-1">Topspeed und Durchzug sind mit der Radarpistole an derselben Stelle gemessen und daher gut vergleichbar. Die Bestzeit dient als dritter Vergleichswert – sie hängt zusätzlich von Grip und Setup ab.</p>
     </div>
   );
 }
@@ -1489,7 +1499,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.2</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.3</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
