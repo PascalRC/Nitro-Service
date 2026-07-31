@@ -81,18 +81,26 @@ function findeArrays(obj, tiefe) {
 }
 
 function datumUhrzeitVon(e) {
-  // Nimmt die Zeit genau so, wie Speedhive sie liefert (inkl. deren Zeitzone),
-  // damit die Anzeige mit der Speedhive-App uebereinstimmt.
+  // Speedhive rechnet Zeiten auf die Zeitzone des Betrachters um - genauso machen wir es.
   if (!e) return null;
   const roh = e.dateTimeStart || e.datetimestart || e.DateTimeStart
     || e.starttimeutc || e.startTimeUtc || e.starttime || e.start || e.startTime;
   if (!roh) return null;
-  const txt = String(roh);
-  const m = txt.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
-  if (m) return { datum: m[1], uhrzeit: m[2] };
+  let d = null;
   const n = Number(roh);
-  if (!isNaN(n) && n > 0) { const u = utcZuDatum(n); return { datum: u.datum, uhrzeit: u.uhrzeit }; }
-  return null;
+  if (!isNaN(n) && n > 0) {
+    const ms = n > 1e14 ? n / 1000 : (n > 1e11 ? n : n * 1000);
+    d = new Date(ms);
+  } else {
+    const t = Date.parse(String(roh));
+    if (!isNaN(t)) d = new Date(t);
+  }
+  if (!d || isNaN(d.getTime())) return null;
+  const zz = (x) => String(x).padStart(2, "0");
+  return {
+    datum: d.getFullYear() + "-" + zz(d.getMonth() + 1) + "-" + zz(d.getDate()),
+    uhrzeit: zz(d.getHours()) + ":" + zz(d.getMinutes()),
+  };
 }
 
 function zeitstempelVon(e) {
@@ -690,19 +698,32 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [manLink, setManLink] = useState("");
   const montiertesAuto = motor ? autos.find((a) => a.motorId === motor.id) : null;
   const ermittleWetterUndSetzePending = async (zeit, datum, uhrzeit, ortHint) => {
-    setLapMsg((ortHint ? "" : "") + "Ermittle deinen Standort für die Temperatur …");
-    const standort = await getStandort();
     let temp = null;
     let ortName = ortHint || (montiertesAuto && montiertesAuto.ort) || "";
-    if (standort) {
-      temp = await fetchTemperaturVonKoordinaten(standort.lat, standort.lon, datum, uhrzeit);
-      const rg = await reverseGeocode(standort.lat, standort.lon);
-      if (rg) ortName = rg;
-    } else if (montiertesAuto && montiertesAuto.ort) {
-      temp = await fetchTemperature(montiertesAuto.ort, datum, uhrzeit);
+    if (ortHint) {
+      // Strecke aus Speedhive: Temperatur fuer die Strecke holen, nicht fuer den aktuellen Standort
+      setLapMsg("Hole Temperatur für " + ortHint + " …");
+      temp = await fetchTemperature(ortHint, datum, uhrzeit);
+      if (temp === null) {
+        const sauber = String(ortHint).replace(/^(MC|AMC|RC|MSC|AC)[\s.-]+/i, "").trim();
+        if (sauber && sauber !== ortHint) temp = await fetchTemperature(sauber, datum, uhrzeit);
+      }
+      if (temp === null && montiertesAuto && montiertesAuto.ort) {
+        temp = await fetchTemperature(montiertesAuto.ort, datum, uhrzeit);
+      }
+    } else {
+      setLapMsg("Ermittle deinen Standort für die Temperatur …");
+      const standort = await getStandort();
+      if (standort) {
+        temp = await fetchTemperaturVonKoordinaten(standort.lat, standort.lon, datum, uhrzeit);
+        const rg = await reverseGeocode(standort.lat, standort.lon);
+        if (rg) ortName = rg;
+      } else if (montiertesAuto && montiertesAuto.ort) {
+        temp = await fetchTemperature(montiertesAuto.ort, datum, uhrzeit);
+      }
     }
     setPendingLap({ zeit, datum, uhrzeit, ort: ortName, temperatur: temp, link: manLink || "" });
-    setLapMsg(temp === null ? "⚠️ Temperatur konnte nicht ermittelt werden (Standortzugriff erlaubt? evtl. zu aktuelles Datum)." : "");
+    setLapMsg(temp === null ? "⚠️ Temperatur konnte nicht ermittelt werden – du kannst sie im Eintrag nachtragen." : "");
     setLapBusy(false);
   };
   const holeVonSpeedhive = async (modus) => {
@@ -1468,7 +1489,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.1</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.2</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
