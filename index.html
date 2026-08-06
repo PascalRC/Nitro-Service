@@ -316,6 +316,7 @@ const seedData = () => ({
     hl: { max: 5, gelb: 1 }, fl: { max: 5, gelb: 1 }, pl: { max: 5, gelb: 1 },
     kz: { max: 4, gelb: 1 },
   },
+  pruef: { kerze: 1, kruemmer: 2 },
 });
 
 const KZ_DEFAULT = () => ({ reset: "2020-01-01", start: 0, note: "", checkedAt: 0 });
@@ -323,6 +324,7 @@ const normalizeData = (d) => {
   const base = seedData();
   const out = { ...base, ...d };
   out.settings = { ...base.settings, ...(d.settings || {}) };
+  out.pruef = { ...base.pruef, ...(d.pruef || {}) };
   const f = d.fahrten || [];
   const summe = (feld, id, abDatum) => f
     .filter((x) => x[feld] === id && (!abDatum || x.datum >= abDatum))
@@ -577,18 +579,45 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
               <span className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</span>
             </div>
             {parts.map(([n, st, c, note]) => <TankBar key={n} name={n} note={note} stand={st} cfg={c} />)}
-            {kzCheck >= 1 && (
-              <div className="mt-2 bg-amber-400/10 border border-amber-400/40 rounded-xl p-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-amber-200">🔍 Kerze prüfen – {fmt(kzCheck)} L seit letzter Prüfung</span>
-                <button onClick={() => up((d) => ({ motoren: d.motoren.map((x) => x.id === m.id ? { ...x, kz: { ...(x.kz || KZ_DEFAULT()), checkedAt: s.kz } } : x) }))}
-                  className="shrink-0 text-xs font-bold rounded-full bg-amber-400 text-slate-950 px-3 py-1 active:bg-amber-300">Geprüft ✓</button>
-              </div>
-            )}
             <div className="mt-2 text-sm font-semibold text-slate-200">
               {next.rest <= 0 ? "⚠️ JETZT fällig: " : "Nächste Wartung: "}{next.n}
               {next.rest > 0 ? ` in ${fmt(next.rest)} L` : ""}
             </div>
           </Card>
+        );
+      })}
+
+      {shownMotoren.map((m) => {
+        const s = motorStands(m);
+        const kz = m.kz || KZ_DEFAULT();
+        const ivKerze = (fullData.pruef && fullData.pruef.kerze) || 1;
+        const ivKruemmer = (fullData.pruef && fullData.pruef.kruemmer) || 2;
+        const kzCheck = s.kz - (kz.checkedAt || 0);
+        const kdCheck = s.gesamt - (m.kdCheckedAt || 0);
+        const offen = [];
+        if (kzCheck >= ivKerze) offen.push({
+          key: "kerze", text: "Kerze prüfen", seit: kzCheck,
+          quittieren: () => up((d) => ({ motoren: d.motoren.map((x) => x.id === m.id ? { ...x, kz: { ...(x.kz || KZ_DEFAULT()), checkedAt: s.kz } } : x) })),
+        });
+        if (kdCheck >= ivKruemmer) offen.push({
+          key: "kruemmer", text: "Krümmerdichtung sichtprüfen", seit: kdCheck,
+          quittieren: () => up((d) => ({ motoren: d.motoren.map((x) => x.id === m.id ? { ...x, kdCheckedAt: s.gesamt } : x) })),
+        });
+        if (!offen.length) return null;
+        return (
+          <div key={"pruef-" + m.id} className="space-y-2">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Sichtprüfungen</h2>
+            {offen.map((o) => (
+              <div key={o.key} className="bg-amber-400/10 border border-amber-400/40 rounded-2xl p-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-amber-200">🔍 {o.text}</div>
+                  <div className="text-xs text-slate-300 tabular-nums">{fmt(o.seit)} L seit letzter Prüfung</div>
+                </div>
+                <button onClick={o.quittieren}
+                  className="shrink-0 text-sm font-bold rounded-xl bg-amber-400 text-slate-950 px-4 py-2 active:bg-amber-300">Geprüft ✓</button>
+              </div>
+            ))}
+          </div>
         );
       })}
     </div>
@@ -1348,6 +1377,21 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
   return (
     <div className="space-y-4">
       <Card>
+        <h3 className="font-bold text-slate-100 mb-1">🔍 Sichtprüfungen</h3>
+        <p className="text-xs text-slate-400 mb-3">Erinnerung im Dashboard – erscheint nach der eingestellten Litermenge und verschwindet nach dem Bestätigen.</p>
+        {[["kerze", "Kerze prüfen alle"], ["kruemmer", "Krümmerdichtung alle"]].map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-sm font-semibold text-slate-200">{label}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <input inputMode="decimal" className={`${inputCls} w-24 text-center`}
+                defaultValue={String((fullData.pruef && fullData.pruef[key]) !== undefined ? fullData.pruef[key] : (key === "kerze" ? 1 : 2)).replace(".", ",")}
+                onBlur={(e) => up((d) => ({ pruef: { ...(d.pruef || {}), [key]: parseNum(e.target.value) } }))} />
+              <span className="text-sm text-slate-300">L</span>
+            </div>
+          </div>
+        ))}
+      </Card>
+      <Card>
         <h3 className="font-bold text-slate-100 mb-1">🎬 Einführung</h3>
         <p className="text-xs text-slate-400 mb-3">Kurze Tour durch alle Funktionen – läuft automatisch ab.</p>
         <button onClick={onTour} className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">▶︎ Tour starten</button>
@@ -1499,7 +1543,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.3</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.4</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
