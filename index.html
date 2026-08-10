@@ -1328,8 +1328,11 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   );
 }
 
-function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour }) {
+function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour, imGast, gastName, onGastLaden, onGastBeenden }) {
   const [showBackup, setShowBackup] = useState(false);
+  const [offen, setOffen] = useState("");
+  const [gastText, setGastText] = useState("");
+  const [gastMsg, setGastMsg] = useState("");
   const [restoreText, setRestoreText] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
   const backupString = JSON.stringify(fullData);
@@ -1374,10 +1377,93 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
       setTimeout(() => setBackupMsg(""), 5000);
     }
   };
+  const bereiche = imGast
+    ? [
+        ["profil", "👤", "Profile", "Gast-Ansicht beenden"],
+        ["tour", "🎬", "Einführung", "Kurze Tour durch alle Funktionen"],
+      ]
+    : [
+        ["profil", "👤", "Profile", "Daten eines Freundes ansehen"],
+        ["maxwerte", "🚦", "Wechselintervalle", "Wann Bauteile fällig werden"],
+        ["sicht", "🔍", "Sichtprüfungen", "Kerze und Krümmerdichtung"],
+        ["sicherung", "💾", "Datensicherung", "Sichern und wiederherstellen"],
+        ["tour", "🎬", "Einführung", "Kurze Tour durch alle Funktionen"],
+      ];
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <h3 className="font-bold text-slate-100 mb-1">🔍 Sichtprüfungen</h3>
+    <div className="space-y-3">
+      {bereiche.map(([key, icon, titel, unter]) => (
+        <div key={key}>
+          <button onClick={() => setOffen(offen === key ? "" : key)}
+            className={`w-full flex items-center gap-3 rounded-2xl border p-4 text-left active:bg-slate-800 ${offen === key ? "bg-slate-900 border-amber-400/60" : "bg-slate-900 border-slate-700/60"}`}>
+            <span className="text-2xl leading-none">{icon}</span>
+            <span className="flex-1">
+              <span className="block font-bold text-slate-100">{titel}</span>
+              <span className="block text-xs text-slate-400">{unter}</span>
+            </span>
+            <span className={`text-lg ${offen === key ? "text-amber-300" : "text-slate-500"}`}>{offen === key ? "▲" : "▼"}</span>
+          </button>
+          {offen === key && (
+            <Card className="mt-2">
+              {key === "profil" && (<>
+        {imGast ? (
+          <>
+            <p className="text-sm font-bold text-sky-300 mb-1">Du siehst gerade: {gastName}</p>
+            <p className="text-xs text-slate-400 mb-3">Gast-Daten können nur angeschaut, nicht geändert werden.</p>
+            <button onClick={onGastBeenden}
+              className="w-full rounded-xl bg-sky-400 text-slate-950 font-bold py-3 active:bg-sky-300">Zurück zu meinen Daten</button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400 mb-3">Sicherungsdatei eines Freundes laden und seine Motoren, Zeiten und Wartungsstände anschauen. Deine eigenen Daten bleiben unverändert.</p>
+            {gastMsg && <p className="text-sm font-semibold text-sky-300 mb-2">{gastMsg}</p>}
+            <label className="block mb-2">
+              <input type="file" accept="application/json,.json,.txt" className="hidden"
+                onChange={(e) => {
+                  const datei = e.target.files && e.target.files[0];
+                  if (!datei) return;
+                  const leser = new FileReader();
+                  leser.onload = () => {
+                    try {
+                      const roh = String(leser.result || "");
+                      const von = roh.indexOf("{"), bis = roh.lastIndexOf("}");
+                      const geparst = JSON.parse(roh.slice(von, bis + 1));
+                      if (!geparst || !Array.isArray(geparst.autos) || !Array.isArray(geparst.motoren)) throw new Error("ungültig");
+                      const name = String(datei.name).replace(/\.(json|txt)$/i, "").replace(/^nitro-service-backup-?/i, "").trim();
+                      onGastLaden(geparst, name || "Gast");
+                    } catch (err) {
+                      setGastMsg("Das sieht nicht wie eine gültige Sicherungsdatei aus.");
+                      setTimeout(() => setGastMsg(""), 5000);
+                    }
+                  };
+                  leser.readAsText(datei);
+                  e.target.value = "";
+                }} />
+              <span className="block w-full text-center rounded-xl bg-sky-400 text-slate-950 font-bold py-3 active:bg-sky-300">📂 Gast-Profil öffnen</span>
+            </label>
+            <label className="block">
+              <span className="block text-xs text-slate-400 mb-1">Oder gesicherten Text einfügen:</span>
+              <textarea rows={2} className={`${inputCls} text-xs`} value={gastText} placeholder='{"activeAutoId":...}'
+                onChange={(e) => setGastText(e.target.value)} />
+            </label>
+            <button onClick={() => {
+                try {
+                  const roh = gastText.replace(/```/g, "").trim();
+                  const von = roh.indexOf("{"), bis = roh.lastIndexOf("}");
+                  const geparst = JSON.parse(roh.slice(von, bis + 1));
+                  if (!geparst || !Array.isArray(geparst.autos) || !Array.isArray(geparst.motoren)) throw new Error("ungültig");
+                  setGastText("");
+                  onGastLaden(geparst, "Gast");
+                } catch (err) {
+                  setGastMsg("Das sieht nicht wie eine gültige Sicherung aus.");
+                  setTimeout(() => setGastMsg(""), 5000);
+                }
+              }}
+              className="w-full rounded-xl border border-sky-400 text-sky-300 font-bold py-2 text-sm mt-2 active:bg-sky-400/10">Text als Gast öffnen</button>
+          </>
+        )}
+              </>)}
+              {key === "sicht" && (<>
         <p className="text-xs text-slate-400 mb-3">Erinnerung im Dashboard – erscheint nach der eingestellten Litermenge und verschwindet nach dem Bestätigen.</p>
         {[["kerze", "Kerze prüfen alle"], ["kruemmer", "Krümmerdichtung alle"]].map(([key, label]) => (
           <div key={key} className="flex items-center justify-between gap-2 mb-2">
@@ -1390,9 +1476,8 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
             </div>
           </div>
         ))}
-      </Card>
-      <Card>
-        <h3 className="font-bold text-slate-100 mb-3">Maximalwerte & Warnungen</h3>
+              </>)}
+              {key === "maxwerte" && (<>
         {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"], ["kz", "Kerze"]].map(([key, label]) => (
           <div key={key} className="grid grid-cols-3 gap-2 items-center mb-2">
             <span className="text-sm font-semibold text-slate-200">{label}</span>
@@ -1406,9 +1491,8 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
             </label>
           </div>
         ))}
-      </Card>
-      <Card>
-        <h3 className="font-bold text-slate-100 mb-2">Datensicherung</h3>
+              </>)}
+              {key === "sicherung" && (<>
         {backupMsg && <p className="text-sm font-semibold text-amber-300 mb-2">{backupMsg}</p>}
         <button onClick={() => {
             const ok = doBackup();
@@ -1458,26 +1542,34 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
         <button onClick={doRestore}
           className={`w-full rounded-xl font-bold py-3 mt-2 ${restoreArmed ? "bg-red-600 text-white" : "border border-amber-400 text-amber-300 active:bg-amber-400/10"}`}>
           {restoreArmed ? "Jetzt überschreiben" : "Wiederherstellen"}</button>
-      </Card>
-      <Card>
-        <h3 className="font-bold text-slate-100 mb-1">🎬 Einführung</h3>
+              </>)}
+              {key === "tour" && (<>
         <p className="text-xs text-slate-400 mb-3">Kurze Tour durch alle Funktionen – läuft automatisch ab.</p>
         <button onClick={onTour} className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">▶︎ Tour starten</button>
-      </Card>
-      <ConfirmButton label="Alle Daten zurücksetzen" confirmLabel="Wirklich ALLES löschen? Nochmal tippen"
-        onConfirm={onResetAll}
-        className="w-full rounded-xl border border-red-500/50 text-red-400 font-bold py-3" />
+              </>)}
+            </Card>
+          )}
+        </div>
+      ))}
+      {!imGast && (
+        <div className="pt-2">
+          <ConfirmButton label="Alle Daten zurücksetzen" confirmLabel="Wirklich ALLES löschen? Nochmal tippen"
+            onConfirm={onResetAll}
+            className="w-full rounded-xl border border-red-500/50 text-red-400 font-bold py-3" />
+        </div>
+      )}
     </div>
   );
 }
-
-// ---------- Main App ----------
 function App() {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("start");
   const [editMotorId, setEditMotorId] = useState(null);
   const [editAutoId, setEditAutoId] = useState(null);
   const [tourOffen, setTourOffen] = useState(false);
+  const [gast, setGast] = useState(null);
+  const [gastName, setGastName] = useState("");
+  const imGast = gast !== null;
   const [saveState, setSaveState] = useState("");
   const saveTimer = useRef(null);
   const loaded = useRef(false);
@@ -1512,9 +1604,13 @@ function App() {
     return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">Lade Daten…</div>;
   }
 
-  const { autos, motoren, fahrten, settings } = data;
+  const anzeige = imGast ? gast : data;
+  const { autos, motoren, fahrten, settings } = anzeige;
   // up akzeptiert ein Objekt ODER eine Funktion (d) => patch – immer auf aktuellem Stand
-  const up = (patch) => setData((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) }));
+  const up = (patch) => {
+    if (imGast) return; // Gastprofil ist nur lesbar
+    setData((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) }));
+  };
 
   const doBackup = () => {
     try {
@@ -1543,20 +1639,30 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.5</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.7</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
+      {imGast && (
+        <div className="bg-sky-500/15 border-b border-sky-400/40 px-4 py-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-bold text-sky-200">👤 Gast-Ansicht{gastName ? ": " + gastName : ""} · nur lesen</span>
+          <button onClick={() => { setGast(null); setGastName(""); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
+            className="shrink-0 text-xs font-bold rounded-xl bg-sky-400 text-slate-950 px-3 py-1.5 active:bg-sky-300">Zurück zu meinen Daten</button>
+        </div>
+      )}
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
         {tourOffen && <TourScreen onClose={() => setTourOffen(false)} />}
-        {!tourOffen && tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={data.activeAutoId} up={up} fullData={data} doBackup={doBackup} />}
-        {!tourOffen && tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={data.activeAutoId} />}
-        {!tourOffen && tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={data.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
+        {!tourOffen && tab === "start" && <DashboardScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} setTab={setTab} activeAutoId={anzeige.activeAutoId} up={up} fullData={anzeige} doBackup={doBackup} />}
+        {!tourOffen && tab === "fahrt" && <FahrtScreen autos={autos} motoren={motoren} fahrten={fahrten} up={up} setTab={setTab} activeAutoId={anzeige.activeAutoId} />}
+        {!tourOffen && tab === "autos" && <AutosScreen autos={autos} motoren={motoren} fahrten={fahrten} settings={settings} up={up} activeAutoId={anzeige.activeAutoId} editAutoId={editAutoId} setEditAutoId={setEditAutoId} />}
         {!tourOffen && tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
-          activeMotorId={(autos.find((a) => a.id === data.activeAutoId) || autos[0])?.motorId || null} autos={autos} />}
+          activeMotorId={(autos.find((a) => a.id === anzeige.activeAutoId) || autos[0])?.motorId || null} autos={autos} />}
         {!tourOffen && tab === "rang" && <RanglisteScreen motoren={motoren} />}
-        {!tourOffen && tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={data.activeAutoId}
-          fullData={data} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
-          onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)} />}
+        {!tourOffen && tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={anzeige.activeAutoId}
+          fullData={anzeige} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
+          onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)}
+          imGast={imGast} gastName={gastName}
+          onGastLaden={(d, name) => { setGast(normalizeData(d)); setGastName(name || "Gast"); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
+          onGastBeenden={() => { setGast(null); setGastName(""); setTab("start"); }} />}
       </main>
       <nav className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-700/60 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map(([key, label, icon]) => (
