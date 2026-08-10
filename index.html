@@ -298,12 +298,73 @@ async function fetchTemperature(ort, datum, uhrzeit) {
   } catch { return null; }
 }
 
-const SPEC_FIELDS = [
-  ["gehaeuse", "Gehäuse"], ["buchse", "Buchse"], ["kolben", "Kolben"], ["welle", "Welle"],
-  ["vergaser", "Vergaser"], ["kopfspalt", "Kopfspalt"], ["venturi", "Venturi"],
-  ["kupplungsfeder", "Kupplungsfeder"], ["kupplungsvorspannung", "Kupplungsvorspannung"],
-  ["gap", "Gap"], ["kerze", "Kerze"], ["reso", "Reso"], ["kruemmer", "Krümmer"],
+const SETUP_GRUPPEN = [
+  ["gehaeuse", "🔩", "Gehäuse", [
+    ["check", "gehaeuse_innen", "Innen geschliffen"],
+    ["check", "gehaeuse_auslass", "Auslass geschliffen"],
+    ["check", "gehaeuse_elox", "Eloxiert"],
+    ["text", "deckel", "Deckel"],
+    ["notiz", "gehaeuse_notiz", "Notiz"],
+  ]],
+  ["buchse", "⚙️", "Buchse", [
+    ["check", "buchse_bearbeitet", "Bearbeitet"],
+    ["text", "buchse_druck_neu", "Druckmaß original neu"],
+    ["text", "buchse_druck_eingefahren", "Druckmaß nach Einfahren"],
+    ["text", "buchse_druck_betrieb", "Druckmaß im Betrieb (akt. Literleistung)"],
+    ["notiz", "buchse_notiz", "Notiz"],
+  ]],
+  ["kolben", "🛢️", "Kolben", [
+    ["check", "kolben_geschliffen", "Geschliffen (sonst original)"],
+    ["notiz", "kolben_notiz", "Notiz"],
+  ]],
+  ["welle", "🔄", "Welle", [
+    ["text", "welle_hersteller", "Hersteller"],
+    ["text", "welle_steuerzeiten", "Steuerzeiten"],
+    ["check", "welle_axial", "Axialspiel"],
+    ["check", "welle_gewuchtet", "Gewuchtet"],
+    ["notiz", "welle_notiz", "Notiz"],
+  ]],
+  ["brennraum", "🔥", "Brennraum", [
+    ["text", "brennraum_hersteller", "Hersteller"],
+    ["text", "kopfspalt", "Kopfspalt"],
+    ["notiz", "brennraum_notiz", "Notiz"],
+  ]],
+  ["kupplung", "🌀", "Kupplung", [
+    ["text", "kupplung_schwungscheibe", "Schwungscheibe"],
+    ["text", "kupplung_fliehgewichte", "Fliehgewichte"],
+    ["check", "kupplung_maden", "Mit Madenschrauben"],
+    ["wahl", "kupplung_bauart", "Bauart", ["Ziehend", "Stechend"]],
+    ["text", "kupplungsfeder", "Kupplungsfeder"],
+    ["text", "kupplung_federkraft", "Federkraft"],
+    ["text", "kupplungsvorspannung", "Kupplungsvorspannung"],
+    ["text", "gap_scheiben", "Gap – verbaute Scheiben"],
+    ["text", "gap", "Gap – erzielter Wert"],
+    ["text", "kupplung_play", "Play"],
+    ["text", "kupplung_scheibe_konus", "Scheibe hinter Konus"],
+    ["notiz", "kupplung_notiz", "Notiz"],
+  ]],
+  ["anbau", "🔧", "Venturi, Kerze, Reso, Krümmer", [
+    ["text", "venturi", "Venturi"],
+    ["text", "kerze", "Kerze"],
+    ["text", "reso", "Reso"],
+    ["text", "kruemmer", "Krümmer"],
+  ]],
 ];
+
+function migriereSpecs(alt) {
+  // Uebernimmt Werte aus der alten flachen Struktur in die neuen Gruppen.
+  const a = alt || {};
+  if (a._migriert) return a;
+  const n = { ...a, _migriert: true };
+  const setze = (ziel, wert) => { if (wert && !n[ziel]) n[ziel] = wert; };
+  setze("gehaeuse_notiz", a.gehaeuse);
+  setze("buchse_notiz", a.buchse);
+  setze("kolben_notiz", a.kolben);
+  setze("welle_steuerzeiten", a.welle);
+  if (a.vergaser && !n.brennraum_notiz) n.brennraum_notiz = "Vergaser: " + a.vergaser;
+  return n;
+}
+
 
 const seedData = () => ({
   activeAutoId: null,
@@ -342,6 +403,7 @@ const normalizeData = (d) => {
   }));
   out.motoren = (d.motoren || []).map((m) => ({
     ...m,
+    specs: migriereSpecs(m.specs),
     motor: migPart(m.motor, "motorId", m.id),
     hl: migPart(m.hl, "motorId", m.id),
     fl: migPart(m.fl, "motorId", m.id),
@@ -431,6 +493,72 @@ function ConfirmButton({ label, confirmLabel, onConfirm, className }) {
       className={`${className} ${armed ? "bg-red-600 text-white border-red-600" : ""}`}>
       {armed ? confirmLabel : label}
     </button>
+  );
+}
+
+function SetupGruppe({ icon, titel, felder, specs, onChange, offen, umschalten }) {
+  const gefuellt = felder.filter(([art, key]) => {
+    const w = specs[key];
+    return art === "check" ? w === true : (w !== undefined && w !== null && String(w).trim() !== "");
+  }).length;
+  return (
+    <div className="mb-2">
+      <button onClick={umschalten}
+        className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left active:bg-slate-800 ${offen ? "bg-slate-950 border-amber-400/60" : "bg-slate-950/60 border-slate-700/60"}`}>
+        <span className="text-xl leading-none">{icon}</span>
+        <span className="flex-1">
+          <span className="block font-bold text-slate-100 text-sm">{titel}</span>
+          <span className="block text-[11px] text-slate-400">{gefuellt > 0 ? gefuellt + " von " + felder.length + " ausgefüllt" : "noch nichts eingetragen"}</span>
+        </span>
+        <span className={`text-base ${offen ? "text-amber-300" : "text-slate-500"}`}>{offen ? "▲" : "▼"}</span>
+      </button>
+      {offen && (
+        <div className="border border-slate-700/60 border-t-0 rounded-b-xl p-3 -mt-1">
+          {felder.map((f) => {
+            const [art, key, label, optionen] = f;
+            if (art === "check") {
+              const an = specs[key] === true;
+              return (
+                <div key={key} className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm text-slate-200">{label}</span>
+                  <button onClick={() => onChange({ ...specs, [key]: !an })}
+                    className={`shrink-0 text-xs font-bold rounded-full px-4 py-1.5 border ${an ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/50" : "bg-slate-800 text-slate-400 border-slate-600"}`}>
+                    {an ? "✓ Ja" : "Nein"}
+                  </button>
+                </div>
+              );
+            }
+            if (art === "wahl") {
+              return (
+                <div key={key} className="mb-2">
+                  <span className="block text-xs text-slate-400 mb-1">{label}</span>
+                  <div className="flex gap-2">
+                    {optionen.map((o) => (
+                      <button key={o} onClick={() => onChange({ ...specs, [key]: specs[key] === o ? "" : o })}
+                        className={`flex-1 text-xs font-bold rounded-xl py-2 border ${specs[key] === o ? "bg-amber-400 text-slate-950 border-amber-400" : "bg-slate-800 text-slate-300 border-slate-600"}`}>{o}</button>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            if (art === "notiz") {
+              return (
+                <label key={key} className="block text-xs text-slate-400 mb-2">{label}
+                  <textarea rows={2} className={`${inputCls} mt-1`} value={specs[key] || ""}
+                    onChange={(e) => onChange({ ...specs, [key]: e.target.value })} />
+                </label>
+              );
+            }
+            return (
+              <label key={key} className="block text-xs text-slate-400 mb-2">{label}
+                <input className={`${inputCls} mt-1`} value={specs[key] || ""}
+                  onChange={(e) => onChange({ ...specs, [key]: e.target.value })} />
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -721,6 +849,8 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   const [lapBusy, setLapBusy] = useState(false);
   const [pendingLap, setPendingLap] = useState(null);
   const [editLapId, setEditLapId] = useState(null);
+  const [setupOffen, setSetupOffen] = useState("");
+  const [manuellOffen, setManuellOffen] = useState(false);
   const [manZeit, setManZeit] = useState("");
   const [manDatum, setManDatum] = useState(today());
   const [manUhrzeit, setManUhrzeit] = useState(new Date().toTimeString().slice(0, 5));
@@ -844,12 +974,12 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
         </Card>
         <Card>
           <h3 className="font-bold text-slate-100 mb-3">Setup & Notizen</h3>
-          {SPEC_FIELDS.map(([key, label]) => (
-            <Field key={key} label={label}>
-              <input className={inputCls} value={motor.specs[key] || ""} onChange={(e) => setMotor({ specs: { ...motor.specs, [key]: e.target.value } })} />
-            </Field>
+          {SETUP_GRUPPEN.map(([gk, icon, titel, felder]) => (
+            <SetupGruppe key={gk} icon={icon} titel={titel} felder={felder}
+              specs={motor.specs || {}} onChange={(neueSpecs) => setMotor({ specs: neueSpecs })}
+              offen={setupOffen === gk} umschalten={() => setSetupOffen(setupOffen === gk ? "" : gk)} />
           ))}
-          <Field label="Notizen"><textarea rows={2} className={inputCls} value={motor.notizen} onChange={(e) => setMotor({ notizen: e.target.value })} /></Field>
+          <Field label="Allgemeine Notizen"><textarea rows={2} className={inputCls} value={motor.notizen} onChange={(e) => setMotor({ notizen: e.target.value })} /></Field>
         </Card>
         <Card>
           <h3 className="font-bold text-slate-100 mb-3">🏆 Motor Auswertung</h3>
@@ -869,34 +999,40 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           {lapMsg && <p className="text-xs font-semibold text-amber-200 mb-2">{lapMsg}</p>}
           {!pendingLap ? (
             <>
-              <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
-                <Field label="Manuell eintragen (Komma oder Punkt)">
-                  <input inputMode="decimal" placeholder="z. B. 13,760" className={`${inputCls} text-lg font-bold tabular-nums`}
-                    value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
-                </Field>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <label className="text-xs text-slate-400">Datum
-                    <input type="date" className={`${inputCls} mt-1`} value={manDatum} onChange={(e) => setManDatum(e.target.value)} />
-                  </label>
-                  <label className="text-xs text-slate-400">Uhrzeit
-                    <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
-                  </label>
-                </div>
-                <label className="block text-xs text-slate-400 mb-3">Speedhive-Link (optional)
-                  <input className={`${inputCls} mt-1 text-xs`} placeholder="https://speedhive.mylaps.com/practice/…"
-                    value={manLink} onChange={(e) => setManLink(e.target.value)} />
-                </label>
-                <button onClick={uebernehmeManuell} disabled={lapBusy || !manZeit.trim()}
-                  className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300 disabled:opacity-40">Weiter zu Grip & Temperatur</button>
-              </div>
               <div className="flex gap-2 mb-2">
                 <button onClick={() => holeVonSpeedhive("tag")} disabled={lapBusy}
                   className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-3 text-sm active:bg-amber-300 disabled:opacity-40">🏁 Schnellste heute</button>
                 <button onClick={() => holeVonSpeedhive("session")} disabled={lapBusy}
                   className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-3 text-sm active:bg-amber-300 disabled:opacity-40">⏱ Letzte Session</button>
               </div>
-              <p className="text-[11px] text-slate-400 mb-3">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
-
+              <p className="text-[11px] text-slate-400 mb-2">Holt die Zeit automatisch vom aktuellsten Speedhive-Fahrtag.</p>
+              {!manuellOffen ? (
+                <button onClick={() => setManuellOffen(true)} disabled={lapBusy}
+                  className="w-full rounded-xl border border-slate-700 text-slate-400 font-semibold py-1.5 text-[11px] mb-3 active:bg-slate-800 disabled:opacity-40">
+                  ✏️ Zeit manuell eintragen
+                </button>
+              ) : (
+                <div className="border border-slate-700/60 rounded-xl p-3 mb-3">
+                  <Field label="Zeit (Komma oder Punkt)">
+                    <input inputMode="decimal" placeholder="z. B. 13,760" className={`${inputCls} text-lg font-bold tabular-nums`}
+                      value={manZeit} onChange={(e) => setManZeit(e.target.value)} />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <label className="text-xs text-slate-400">Datum
+                      <input type="date" className={`${inputCls} mt-1`} value={manDatum} onChange={(e) => setManDatum(e.target.value)} />
+                    </label>
+                    <label className="text-xs text-slate-400">Uhrzeit
+                      <input type="time" className={`${inputCls} mt-1`} value={manUhrzeit} onChange={(e) => setManUhrzeit(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={uebernehmeManuell} disabled={lapBusy || !manZeit.trim()}
+                      className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300 disabled:opacity-40">Weiter</button>
+                    <button onClick={() => setManuellOffen(false)}
+                      className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2.5 text-sm active:bg-slate-800">Abbrechen</button>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl p-3 mb-3">
@@ -1639,7 +1775,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.7</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">1.8</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       {imGast && (
