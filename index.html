@@ -698,10 +698,15 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
           <select className="rounded-xl border-2 border-amber-400/70 px-3 py-2 text-sm font-bold bg-slate-800 text-amber-300" value={activeAuto.motorId || ""}
             onChange={(e) => up((d) => ({ autos: d.autos.map((a) => a.id === activeAuto.id ? { ...a, motorId: e.target.value } : a) }))}>
             <option value="">– kein Motor –</option>
-            {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {motoren.filter((m) => m.favorit || m.id === activeAuto.motorId).map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
           </select>
         )}
       </div>
+      {activeAuto && motoren.length > 1 && motoren.filter((m) => m.favorit).length === 0 && (
+        <p className="text-xs text-slate-400 -mt-1">Tipp: Motoren unter „Motoren“ mit ★ markieren – dann erscheinen sie hier zur schnellen Auswahl.</p>
+      )}
       {shownMotoren.length === 0 && (
         <Card className="text-sm text-slate-300">
           {motoren.length === 0 ? (
@@ -1143,6 +1148,9 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
         const isActive = m.id === activeMotorId;
         return (
           <Card key={m.id} className="flex items-center justify-between active:bg-slate-800" >
+            <button onClick={() => up((d) => ({ motoren: d.motoren.map((x) => x.id === m.id ? { ...x, favorit: !x.favorit } : x) }))}
+              className={`shrink-0 text-2xl leading-none px-2 py-1 mr-1 ${m.favorit ? "text-amber-300" : "text-slate-600"}`}
+              title="Favorit">{m.favorit ? "★" : "☆"}</button>
             <button onClick={() => setEditMotorId(m.id)} className="flex-1 text-left">
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-slate-100">{m.name}</span>
@@ -1220,6 +1228,47 @@ function RanglisteScreen({ motoren }) {
         </Card>
       ))}
       <p className="text-xs text-slate-400 px-1">Topspeed und Durchzug sind mit der Radarpistole an derselben Stelle gemessen und daher gut vergleichbar. Die Bestzeit dient als dritter Vergleichswert – sie hängt zusätzlich von Grip und Setup ab.</p>
+    </div>
+  );
+}
+
+const VERSION = "2.3";
+const NEUERUNGEN = [
+  ["2.3", [
+    "Favoriten: Motoren lassen sich in der Motorenliste mit ★ markieren.",
+    "Im Dashboard erscheinen nur noch favorisierte Motoren in der Schnellauswahl.",
+    "Neu: Diese Übersicht zeigt dir nach jedem Update, was sich geändert hat.",
+  ]],
+  ["2.2", [
+    "Eingabefelder ragen nicht mehr über die Kartenränder hinaus (besonders Datum und Uhrzeit).",
+  ]],
+  ["2.1", [
+    "Motor- und Auto-Auswahl im Dashboard deutlich hervorgehoben.",
+    "Kräftigere Umrandungen für alle Karten.",
+    "Setup-Gruppe heißt jetzt „Gehäuse / Vergaser“, weil dort auch das Venturi liegt.",
+    "Komplette Rechtschreib- und Textprüfung der gesamten App.",
+  ]],
+  ["2.0", [
+    "Echte Fotos deiner Bauteile als Symbole im Setup-Bereich.",
+  ]],
+  ["1.8", [
+    "Setup & Notizen komplett neu sortiert in aufklappbare Gruppen.",
+    "Neue Felder für Buchse, Welle, Brennraum und Kupplung.",
+  ]],
+];
+
+function NeuerungenHinweis({ onSchliessen }) {
+  const eintrag = NEUERUNGEN[0];
+  return (
+    <div className="fixed inset-0 z-30 bg-slate-950/90 flex items-end justify-center p-4">
+      <div className="w-full max-w-md bg-slate-900 border-2 border-amber-400/60 rounded-2xl p-4 mb-20">
+        <h3 className="text-lg font-extrabold text-amber-300 mb-1">🎉 Neu in Version {eintrag[0]}</h3>
+        <ul className="text-sm text-slate-200 space-y-2 my-3">
+          {eintrag[1].map((z, i) => <li key={i} className="flex gap-2"><span className="text-amber-400">•</span><span>{z}</span></li>)}
+        </ul>
+        <button onClick={onSchliessen}
+          className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">Alles klar</button>
+      </div>
     </div>
   );
 }
@@ -1724,6 +1773,7 @@ function App() {
   const [editMotorId, setEditMotorId] = useState(null);
   const [editAutoId, setEditAutoId] = useState(null);
   const [tourOffen, setTourOffen] = useState(false);
+  const [neuHinweis, setNeuHinweis] = useState(false);
   const [gast, setGast] = useState(null);
   const [gastName, setGastName] = useState("");
   const imGast = gast !== null;
@@ -1739,6 +1789,9 @@ function App() {
       } catch {
         setData(seedData());
       }
+      try {
+        if (localStorage.getItem("vg8-version") !== VERSION) setNeuHinweis(true);
+      } catch { /* ohne Speicher kein Hinweis */ }
       loaded.current = true;
     })();
   }, []);
@@ -1796,9 +1849,13 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">2.2</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">{VERSION}</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
+      {neuHinweis && <NeuerungenHinweis onSchliessen={() => {
+        setNeuHinweis(false);
+        try { localStorage.setItem("vg8-version", VERSION); } catch { /* egal */ }
+      }} />}
       {imGast && (
         <div className="bg-sky-500/15 border-b border-sky-400/40 px-4 py-2 flex items-center justify-between gap-2">
           <span className="text-xs font-bold text-sky-200">👤 Gast-Ansicht{gastName ? ": " + gastName : ""} · nur lesen</span>
