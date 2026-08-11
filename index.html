@@ -1382,8 +1382,11 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.5";
+const VERSION = "2.6";
 const NEUERUNGEN = [
+  ["2.6", [
+    "Die Kopfzeile der App wird nicht mehr von der iPhone-Statusleiste überdeckt.",
+  ]],
   ["2.5", [
     "Die Motoren-Auswahl im Vergleich ist jetzt eingeklappt und öffnet sich erst beim Antippen.",
     "Senkrechte Trennlinien im Vergleich zeigen klar, welcher Wert zu welchem Motor gehört.",
@@ -2026,7 +2029,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
-      <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
+      <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 pb-3 flex items-baseline justify-between"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
         <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">{VERSION}</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
