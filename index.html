@@ -1191,7 +1191,8 @@ function MotorVergleich({ motoren, onSchliessen }) {
   const spalten = motoren.length;
   return (
     <div className="fixed inset-0 z-30 bg-slate-950/95 overflow-y-auto">
-      <div className="sticky top-0 bg-slate-950 border-b-2 border-amber-400 px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 bg-slate-950 border-b-2 border-amber-400 px-4 pb-3 flex items-center justify-between"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
         <span className="font-extrabold text-amber-300">⚖️ Motoren-Vergleich</span>
         <button onClick={onSchliessen}
           className="rounded-xl bg-amber-400 text-slate-950 font-bold px-4 py-2 text-sm active:bg-amber-300">Schließen</button>
@@ -1200,7 +1201,7 @@ function MotorVergleich({ motoren, onSchliessen }) {
         <Card>
           <div className={`grid gap-2 mb-1`} style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
             <span className="text-xs font-bold text-slate-400">Motor</span>
-            {motoren.map((m) => <span key={m.id} className="text-sm font-extrabold text-amber-300 break-words">{m.name}</span>)}
+            {motoren.map((m) => <span key={m.id} className="text-sm font-extrabold text-amber-300 break-words pl-2 border-l-2 border-amber-400/60">{m.name}</span>)}
           </div>
         </Card>
         <Card>
@@ -1213,7 +1214,7 @@ function MotorVergleich({ motoren, onSchliessen }) {
                 style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
                 <span className="text-sm text-slate-300">{label}</span>
                 {werte.map((w, i) => (
-                  <span key={i} className={`text-sm tabular-nums ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
+                  <span key={i} className={`text-sm tabular-nums pl-2 ${i > 0 ? "border-l-2 border-slate-600" : "border-l-2 border-slate-600"} ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
                 ))}
               </div>
             );
@@ -1239,7 +1240,7 @@ function MotorVergleich({ motoren, onSchliessen }) {
                     style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
                     <span className="text-sm text-slate-300 break-words">{label}</span>
                     {werte.map((w, i) => (
-                      <span key={i} className={`text-sm break-words ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
+                      <span key={i} className={`text-sm break-words pl-2 border-l-2 border-slate-600 ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
                     ))}
                   </div>
                 );
@@ -1250,8 +1251,8 @@ function MotorVergleich({ motoren, onSchliessen }) {
         <Card>
           <h4 className="font-bold text-slate-100 mb-2">📝 Allgemeine Notizen</h4>
           <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${spalten}, 1fr)` }}>
-            {motoren.map((m) => (
-              <div key={m.id}>
+            {motoren.map((m, i) => (
+              <div key={m.id} className={i > 0 ? "pl-2 border-l-2 border-slate-600" : ""}>
                 <div className="text-xs font-bold text-amber-300 mb-1 break-words">{m.name}</div>
                 <div className="text-sm text-slate-200 break-words">{m.notizen && m.notizen.trim() ? m.notizen : "–"}</div>
               </div>
@@ -1259,6 +1260,8 @@ function MotorVergleich({ motoren, onSchliessen }) {
           </div>
         </Card>
         <p className="text-xs text-slate-400 px-1">Gelb hinterlegte Zeilen zeigen Unterschiede zwischen den Motoren. Felder, die bei keinem Motor gefüllt sind, werden ausgeblendet.</p>
+        <button onClick={onSchliessen}
+          className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">Vergleich schließen</button>
       </div>
     </div>
   );
@@ -1267,6 +1270,7 @@ function MotorVergleich({ motoren, onSchliessen }) {
 function RanglisteScreen({ motoren }) {
   const [gewaehlt, setGewaehlt] = useState([]);
   const [vergleichOffen, setVergleichOffen] = useState(false);
+  const [auswahlOffen, setAuswahlOffen] = useState(false);
   const liste = motoren
     .map((m) => {
       const rz = m.rundenzeiten || [];
@@ -1299,12 +1303,20 @@ function RanglisteScreen({ motoren }) {
         <MotorVergleich motoren={auswahl} onSchliessen={() => setVergleichOffen(false)} />
       )}
       <Card>
-        <h3 className="font-bold text-slate-100 mb-1">⚖️ Motoren vergleichen</h3>
-        <p className="text-xs text-slate-400 mb-3">Zwei oder drei Motoren auswählen – Unterschiede im Setup werden hervorgehoben.</p>
-        {motoren.length < 2 ? (
-          <p className="text-sm text-slate-400">Dafür brauchst du mindestens zwei angelegte Motoren.</p>
+        <button onClick={() => setAuswahlOffen(!auswahlOffen)} className="w-full flex items-center gap-3 text-left">
+          <span className="text-2xl leading-none">⚖️</span>
+          <span className="flex-1">
+            <span className="block font-bold text-slate-100">Motoren vergleichen</span>
+            <span className="block text-xs text-slate-400">
+              {gewaehlt.length > 0 ? gewaehlt.length + " ausgewählt" : "Zwei oder drei Motoren auswählen"}
+            </span>
+          </span>
+          <span className={`text-lg ${auswahlOffen ? "text-amber-300" : "text-slate-500"}`}>{auswahlOffen ? "▲" : "▼"}</span>
+        </button>
+        {auswahlOffen && (motoren.length < 2 ? (
+          <p className="text-sm text-slate-400 mt-3">Dafür brauchst du mindestens zwei angelegte Motoren.</p>
         ) : (
-          <>
+          <div className="mt-3">
             <div className="space-y-2 mb-3">
               {motoren.map((m) => {
                 const an = gewaehlt.includes(m.id);
@@ -1327,8 +1339,8 @@ function RanglisteScreen({ motoren }) {
               className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300 disabled:opacity-40">
               {auswahl.length < 2 ? "Mindestens 2 Motoren wählen" : "Auswertung anzeigen (" + auswahl.length + ")"}
             </button>
-          </>
-        )}
+          </div>
+        ))}
       </Card>
       <Card className="py-2">
         <p className="text-xs text-slate-300">Reihenfolge: <span className="font-bold text-amber-300">1. Topspeed</span> → <span className="font-bold text-amber-300">2. Durchzug</span> → <span className="font-bold text-amber-300">3. Bestzeit</span></p>
@@ -1370,8 +1382,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.4";
+const VERSION = "2.5";
 const NEUERUNGEN = [
+  ["2.5", [
+    "Die Motoren-Auswahl im Vergleich ist jetzt eingeklappt und öffnet sich erst beim Antippen.",
+    "Senkrechte Trennlinien im Vergleich zeigen klar, welcher Wert zu welchem Motor gehört.",
+    "Der Schließen-Knopf wird nicht mehr von der Uhrzeit verdeckt – zusätzlich gibt es einen am Ende.",
+  ]],
   ["2.4", [
     "Neu in der Rangliste: Motoren-Vergleich für zwei oder drei Motoren.",
     "Unterschiede im Setup werden dabei automatisch gelb hervorgehoben.",
