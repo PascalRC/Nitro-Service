@@ -299,7 +299,7 @@ async function fetchTemperature(ort, datum, uhrzeit) {
 }
 
 const SETUP_GRUPPEN = [
-  ["gehaeuse", "gehaeuse", "Gehäuse", [
+  ["gehaeuse", "gehaeuse", "Gehäuse / Vergaser", [
     ["check", "gehaeuse_innen", "Innen geschliffen"],
     ["check", "gehaeuse_auslass", "Auslass geschliffen"],
     ["check", "gehaeuse_elox", "Eloxiert"],
@@ -468,7 +468,7 @@ function TankBar({ name, note, stand, cfg }) {
 }
 
 function Card({ children, className = "" }) {
-  return <div className={`bg-slate-900 rounded-2xl border border-slate-700/60 p-4 ${className}`}>{children}</div>;
+  return <div className={`bg-slate-900 rounded-2xl border-2 border-slate-600 p-4 ${className}`}>{children}</div>;
 }
 
 function Field({ label, children }) {
@@ -661,7 +661,7 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Aktives Auto</h2>
         {autos.length > 1 && (
-          <select className="rounded-xl border border-slate-600 px-2 py-1 text-sm bg-slate-800 text-slate-100" value={activeAuto?.id || ""}
+          <select className="rounded-xl border-2 border-amber-400/70 px-3 py-2 text-sm font-bold bg-slate-800 text-amber-300" value={activeAuto?.id || ""}
             onChange={(e) => up({ activeAutoId: e.target.value })}>
             {autos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
@@ -670,7 +670,7 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
       {autos.length === 0 && (
         <Card className="text-sm text-slate-300">
           Noch kein Auto angelegt.{" "}
-          <button onClick={() => setTab("autos")} className="font-bold text-amber-300 underline">Unter „Autos" anlegen →</button>
+          <button onClick={() => setTab("autos")} className="font-bold text-amber-300 underline">Unter „Autos“ anlegen →</button>
         </Card>
       )}
       {shownAutos.map((a) => {
@@ -691,7 +691,7 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
       <div className="flex items-center justify-between pt-2">
         <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Motor im Auto</h2>
         {activeAuto && motoren.length > 0 && (
-          <select className="rounded-xl border border-slate-600 px-2 py-1 text-sm bg-slate-800 text-slate-100" value={activeAuto.motorId || ""}
+          <select className="rounded-xl border-2 border-amber-400/70 px-3 py-2 text-sm font-bold bg-slate-800 text-amber-300" value={activeAuto.motorId || ""}
             onChange={(e) => up((d) => ({ autos: d.autos.map((a) => a.id === activeAuto.id ? { ...a, motorId: e.target.value } : a) }))}>
             <option value="">– kein Motor –</option>
             {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -704,7 +704,7 @@ function DashboardScreen({ autos, motoren, fahrten, settings, setTab, activeAuto
             <>Noch kein Motor angelegt.{" "}
               <button onClick={() => setTab("motoren")} className="font-bold text-amber-300 underline">Jetzt anlegen →</button></>
           ) : (
-            <>Kein Motor im aktiven Auto ausgewählt – wähle unter „Autos" beim Auto einen Motor aus.</>
+            <>Kein Motor im aktiven Auto ausgewählt – wähle unter „Autos“ beim Auto einen Motor aus.</>
           )}
         </Card>
       )}
@@ -779,7 +779,7 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
   if (autos.length === 0 || motoren.length === 0) {
     return (
       <Card className="text-sm text-slate-300 space-y-2">
-        <p className="font-bold text-slate-100">Bevor Du Fahrten eintragen kannst:</p>
+        <p className="font-bold text-slate-100">Bevor du Fahrten eintragen kannst:</p>
         {motoren.length === 0 && <button onClick={() => setTab("motoren")} className="block font-bold text-amber-300 underline">1. Motor anlegen →</button>}
         {autos.length === 0 && <button onClick={() => setTab("autos")} className="block font-bold text-amber-300 underline">{motoren.length === 0 ? "2." : "1."} Auto anlegen →</button>}
       </Card>
@@ -841,7 +841,7 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
         <span className="text-xs text-slate-400 tabular-nums">{fahrten.length} Einträge</span>
       </div>
       <p className="text-[11px] text-slate-400 -mt-2">Nur eine Auflistung. Löschen entfernt den Eintrag aus dieser Liste – die Literstände bleiben unverändert.</p>
-      {fahrten.length === 0 && <Card className="text-sm text-slate-400">Noch keine Fahrten – trage oben Deine erste ein.</Card>}
+      {fahrten.length === 0 && <Card className="text-sm text-slate-400">Noch keine Fahrten – trage oben deine erste ein.</Card>}
       {[...fahrten].sort((a, b) => (b.ts || 0) - (a.ts || 0) || String(b.datum).localeCompare(String(a.datum))).map((f) => (
         <Card key={f.id} className="flex items-center justify-between py-3">
           <div>
@@ -904,7 +904,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   };
   const holeVonSpeedhive = async (modus) => {
     if (!montiertesAuto || (!montiertesAuto.transponder && !montiertesAuto.activityId)) {
-      setLapMsg("Bitte das Auto zuerst unter 'Autos' mit Speedhive verknüpfen.");
+      setLapMsg("Bitte das Auto zuerst unter „Autos“ mit Speedhive verknüpfen.");
       return;
     }
     setLapBusy(true);
@@ -917,7 +917,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
       setLapMsg("Gefunden (" + res.quelle + "): " + res.zeit + " – ermittle Temperatur …");
       await ermittleWetterUndSetzePending(res.zeit, res.datum, res.uhrzeit, res.ort);
     } catch (e) {
-      setLapMsg("❌ Abruf fehlgeschlagen. Ist das Auto unter 'Autos' mit Speedhive verknüpft? Sonst die Zeit oben manuell eintragen.");
+      setLapMsg("❌ Abruf fehlgeschlagen. Ist das Auto unter „Autos“ mit Speedhive verknüpft? Sonst die Zeit oben manuell eintragen.");
       setLapBusy(false);
     }
   };
@@ -1005,7 +1005,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
             <Field label="Topspeed [km/h]"><input inputMode="decimal" className={inputCls} value={motor.topspeed} onChange={(e) => setMotor({ topspeed: e.target.value })} /></Field>
           </div>
           {montiertesAuto ? (
-            <Field label="Fallback-Ort (nur falls Standortzugriff nicht möglich)">
+            <Field label="Ausweich-Ort (falls kein Standortzugriff möglich)">
               <input placeholder="z. B. Ettlingen" className={inputCls} value={montiertesAuto.ort || ""}
                 onChange={(e) => up((d) => ({ autos: d.autos.map((a) => a.id === montiertesAuto.id ? { ...a, ort: e.target.value } : a) }))} />
             </Field>
@@ -1131,7 +1131,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   }
   return (
     <div className="space-y-3">
-      {motoren.length === 0 && <Card className="text-sm text-slate-400">Noch kein Motor – lege unten Deinen ersten an.</Card>}
+      {motoren.length === 0 && <Card className="text-sm text-slate-400">Noch kein Motor – lege unten deinen ersten an.</Card>}
       {motoren.map((m) => {
         const s = motorStands(m);
         const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl), statusOf(s.kz, settings.kz)]
@@ -1222,16 +1222,16 @@ function RanglisteScreen({ motoren }) {
 
 const TOUR = [
   { icon: "🏁", titel: "Willkommen bei Nitro Service", text: "Diese App zählt die Laufleistung deiner Autos und Motoren in Litern und warnt dich rechtzeitig, bevor ein Bauteil fällig wird.", demo: "start" },
-  { icon: "🚗", titel: "1. Auto anlegen", text: "Tippe unten auf 'Autos' und dann auf '+ Auto hinzufügen'. Gib ihm einen Namen und wähle den montierten Motor aus.", demo: "auto" },
-  { icon: "🔧", titel: "2. Motor anlegen", text: "Unter 'Motoren' legst du deine Motoren an – mit Setup-Daten wie Buchse, Kolben, Welle und Vergaser.", demo: "motor" },
-  { icon: "⛽", titel: "3. Jede Fahrt eintragen", text: "Nach dem Fahren unter 'Fahrt' die getankten Liter eintragen. Nutze die Schnelltasten +0,25 / +0,5 / +1 L.", demo: "fahrt" },
+  { icon: "🚗", titel: "1. Auto anlegen", text: "Tippe unten auf „Autos“ und dann auf „+ Auto hinzufügen“. Gib ihm einen Namen und wähle den montierten Motor aus.", demo: "auto" },
+  { icon: "🔧", titel: "2. Motor anlegen", text: "Unter „Motoren“ legst du deine Motoren an – mit allen Setup-Daten wie Gehäuse, Buchse, Kolben und Welle.", demo: "motor" },
+  { icon: "⛽", titel: "3. Jede Fahrt eintragen", text: "Nach dem Fahren unter „Fahrt“ die getankten Liter eintragen. Nutze die Schnelltasten +0,25 / +0,5 / +1 L.", demo: "fahrt" },
   { icon: "📊", titel: "4. Alles rechnet automatisch", text: "Die Liter zählen automatisch auf alle Bauteile hoch: Freiläufe, Hauptlager, Frontlager, Pleuel und Kerze.", demo: "balken" },
   { icon: "🚦", titel: "5. Die Ampel im Blick", text: "Grün = alles gut. Gelb = bald fällig. Rot = jetzt wechseln! Das Dashboard zeigt dir immer, was als Nächstes ansteht.", demo: "ampel" },
-  { icon: "♻️", titel: "6. Teil getauscht?", text: "Beim jeweiligen Bauteil auf 'Teil getauscht' tippen. Der Zähler startet neu – und die alte Standzeit landet in der Historie.", demo: "reset" },
+  { icon: "♻️", titel: "6. Teil getauscht?", text: "Beim jeweiligen Bauteil auf „Teil getauscht“ tippen. Der Zähler startet neu – und die alte Standzeit landet in der Historie.", demo: "reset" },
   { icon: "📜", titel: "7. Aus der Historie lernen", text: "Jedes getauschte Teil wird mit Hersteller und gefahrenen Litern gespeichert. So siehst du mit der Zeit, welche Lager am längsten halten.", demo: "historie" },
-  { icon: "🔗", titel: "8. Speedhive verknüpfen", text: "Einmalig pro Auto: Speedhive-App öffnen, eine Session teilen, Link kopieren – dann unter 'Autos' auf 'Jetzt verknüpfen' und einfügen. Danach nie wieder nötig.", demo: "verknuepfen" },
-  { icon: "🏆", titel: "9. Motoren vergleichen", text: "Bei 'Motoren' holst du mit einem Tipp die schnellste Runde des Tages oder der letzten Session. Temperatur und Ort kommen automatisch – du wählst nur den Grip.", demo: "auswertung" },
-  { icon: "💾", titel: "10. Daten sichern", text: "Unter 'Mehr' regelmäßig auf 'Als Datei sichern' tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
+  { icon: "🔗", titel: "8. Speedhive verknüpfen", text: "Einmalig pro Auto: Speedhive-App öffnen, eine Session teilen, Link kopieren – dann unter „Autos“ auf „Jetzt verknüpfen“ und einfügen. Danach nie wieder nötig.", demo: "verknuepfen" },
+  { icon: "🏆", titel: "9. Motoren vergleichen", text: "Bei „Motoren“ holst du mit einem Tipp die schnellste Runde des Tages oder der letzten Session. Temperatur und Ort kommen automatisch – du wählst nur den Grip.", demo: "auswertung" },
+  { icon: "💾", titel: "10. Daten sichern", text: "Unter „Mehr“ regelmäßig auf „Als Datei sichern“ tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
 ];
 
 function TourDemo({ art }) {
@@ -1618,7 +1618,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               </>)}
               {key === "sicht" && (<>
         <p className="text-xs text-slate-400 mb-3">Erinnerung im Dashboard – erscheint nach der eingestellten Litermenge und verschwindet nach dem Bestätigen.</p>
-        {[["kerze", "Kerze prüfen alle"], ["kruemmer", "Krümmerdichtung alle"]].map(([key, label]) => (
+        {[["kerze", "Kerze prüfen alle"], ["kruemmer", "Krümmerdichtung prüfen alle"]].map(([key, label]) => (
           <div key={key} className="flex items-center justify-between gap-2 mb-2">
             <span className="text-sm font-semibold text-slate-200">{label}</span>
             <div className="flex items-center gap-2 shrink-0">
@@ -1792,7 +1792,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
       <header className="sticky top-0 z-10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-950 border-b-2 border-amber-400 text-white px-4 py-3 flex items-baseline justify-between">
-        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">2.0</span></h1>
+        <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">2.1</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
       {imGast && (
