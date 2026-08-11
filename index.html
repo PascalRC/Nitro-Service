@@ -988,6 +988,13 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           <Field label="Motor-Name">
             <input className={`${inputCls} font-extrabold`} value={motor.name} onChange={(e) => setMotor({ name: e.target.value })} />
           </Field>
+        </Card>
+        <Card>
+          <h3 className="font-bold text-slate-100 mb-2">📝 Notizen zum Motor</h3>
+          <textarea rows={4} placeholder="z. B. Einlaufverhalten, Auffälligkeiten, geplante Arbeiten …" className={inputCls}
+            value={motor.notizen || ""} onChange={(e) => setMotor({ notizen: e.target.value })} />
+        </Card>
+        <Card>
           <div className="bg-amber-400/10 border border-amber-400/40 rounded-xl px-3 py-2 mb-3 flex items-baseline justify-between">
             <span className="text-xs font-bold uppercase tracking-wide text-amber-200">Motor gesamt</span>
             <span className="text-2xl font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</span>
@@ -1005,7 +1012,6 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
               specs={motor.specs || {}} onChange={(neueSpecs) => setMotor({ specs: neueSpecs })}
               offen={setupOffen === gk} umschalten={() => setSetupOffen(setupOffen === gk ? "" : gk)} />
           ))}
-          <Field label="Allgemeine Notizen"><textarea rows={2} className={inputCls} value={motor.notizen} onChange={(e) => setMotor({ notizen: e.target.value })} /></Field>
         </Card>
         <Card>
           <h3 className="font-bold text-slate-100 mb-3">🏆 Motor Auswertung</h3>
@@ -1249,7 +1255,7 @@ function MotorVergleich({ motoren, onSchliessen }) {
           );
         })}
         <Card>
-          <h4 className="font-bold text-slate-100 mb-2">📝 Allgemeine Notizen</h4>
+          <h4 className="font-bold text-slate-100 mb-2">📝 Notizen zum Motor</h4>
           <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${spalten}, 1fr)` }}>
             {motoren.map((m, i) => (
               <div key={m.id} className={i > 0 ? "pl-2 border-l-2 border-slate-600" : ""}>
@@ -1382,8 +1388,12 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.6";
+const VERSION = "2.7";
 const NEUERUNGEN = [
+  ["2.7", [
+    "Notizen zum Motor stehen jetzt als eigener Block direkt unter dem Motornamen.",
+    "Das doppelte Notizfeld unten bei „Setup & Notizen“ ist entfallen – die Bauteil-Gruppen haben ja eigene Notizen.",
+  ]],
   ["2.6", [
     "Die Kopfzeile der App wird nicht mehr von der iPhone-Statusleiste überdeckt.",
   ]],
