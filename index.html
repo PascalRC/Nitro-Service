@@ -1168,7 +1168,105 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   );
 }
 
+function MotorVergleich({ motoren, onSchliessen }) {
+  const anzeige = (art, wert) => {
+    if (art === "check") return wert === true ? "Ja" : wert === false || wert === undefined ? "Nein" : String(wert);
+    return wert === undefined || wert === null || String(wert).trim() === "" ? "–" : String(wert);
+  };
+  const besteZeit = (m) => {
+    let b = null;
+    for (const r of (m.rundenzeiten || [])) {
+      const sek = parseLapSeconds(r.zeit);
+      if (sek !== null && (b === null || sek < b)) b = sek;
+    }
+    return b === null ? "–" : fmtLap(String(b));
+  };
+  const leistung = [
+    ["Topspeed [km/h]", (m) => m.topspeed || "–"],
+    ["Durchzug [km/h]", (m) => m.durchzug || "–"],
+    ["Beste Runde", besteZeit],
+    ["Laufleistung [L]", (m) => fmt(standOf(m.motor))],
+  ];
+  const unterschiedlich = (werte) => new Set(werte.map((w) => String(w).trim().toLowerCase())).size > 1;
+  const spalten = motoren.length;
+  return (
+    <div className="fixed inset-0 z-30 bg-slate-950/95 overflow-y-auto">
+      <div className="sticky top-0 bg-slate-950 border-b-2 border-amber-400 px-4 py-3 flex items-center justify-between">
+        <span className="font-extrabold text-amber-300">⚖️ Motoren-Vergleich</span>
+        <button onClick={onSchliessen}
+          className="rounded-xl bg-amber-400 text-slate-950 font-bold px-4 py-2 text-sm active:bg-amber-300">Schließen</button>
+      </div>
+      <div className="p-4 pb-24 space-y-4">
+        <Card>
+          <div className={`grid gap-2 mb-1`} style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
+            <span className="text-xs font-bold text-slate-400">Motor</span>
+            {motoren.map((m) => <span key={m.id} className="text-sm font-extrabold text-amber-300 break-words">{m.name}</span>)}
+          </div>
+        </Card>
+        <Card>
+          <h4 className="font-bold text-slate-100 mb-2">🏆 Leistung</h4>
+          {leistung.map(([label, f]) => {
+            const werte = motoren.map(f);
+            const diff = unterschiedlich(werte);
+            return (
+              <div key={label} className={`grid gap-2 py-2 border-t border-slate-700/60 ${diff ? "bg-amber-400/10 rounded-lg px-1" : ""}`}
+                style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
+                <span className="text-sm text-slate-300">{label}</span>
+                {werte.map((w, i) => (
+                  <span key={i} className={`text-sm tabular-nums ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
+                ))}
+              </div>
+            );
+          })}
+        </Card>
+        {SETUP_GRUPPEN.map(([gk, icon, titel, felder]) => {
+          const zeilen = felder.filter(([art, key]) => {
+            const werte = motoren.map((m) => anzeige(art, (m.specs || {})[key]));
+            return werte.some((w) => w !== "–" && w !== "Nein");
+          });
+          if (!zeilen.length) return null;
+          return (
+            <Card key={gk}>
+              <div className="flex items-center gap-2 mb-2">
+                <TeilIcon art={icon} />
+                <h4 className="font-bold text-slate-100">{titel}</h4>
+              </div>
+              {zeilen.map(([art, key, label]) => {
+                const werte = motoren.map((m) => anzeige(art, (m.specs || {})[key]));
+                const diff = unterschiedlich(werte);
+                return (
+                  <div key={key} className={`grid gap-2 py-2 border-t border-slate-700/60 ${diff ? "bg-amber-400/10 rounded-lg px-1" : ""}`}
+                    style={{ gridTemplateColumns: `1.1fr repeat(${spalten}, 1fr)` }}>
+                    <span className="text-sm text-slate-300 break-words">{label}</span>
+                    {werte.map((w, i) => (
+                      <span key={i} className={`text-sm break-words ${diff ? "font-bold text-amber-200" : "text-slate-100"}`}>{w}</span>
+                    ))}
+                  </div>
+                );
+              })}
+            </Card>
+          );
+        })}
+        <Card>
+          <h4 className="font-bold text-slate-100 mb-2">📝 Allgemeine Notizen</h4>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${spalten}, 1fr)` }}>
+            {motoren.map((m) => (
+              <div key={m.id}>
+                <div className="text-xs font-bold text-amber-300 mb-1 break-words">{m.name}</div>
+                <div className="text-sm text-slate-200 break-words">{m.notizen && m.notizen.trim() ? m.notizen : "–"}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <p className="text-xs text-slate-400 px-1">Gelb hinterlegte Zeilen zeigen Unterschiede zwischen den Motoren. Felder, die bei keinem Motor gefüllt sind, werden ausgeblendet.</p>
+      </div>
+    </div>
+  );
+}
+
 function RanglisteScreen({ motoren }) {
+  const [gewaehlt, setGewaehlt] = useState([]);
+  const [vergleichOffen, setVergleichOffen] = useState(false);
   const liste = motoren
     .map((m) => {
       const rz = m.rundenzeiten || [];
@@ -1190,8 +1288,48 @@ function RanglisteScreen({ motoren }) {
       if (sb !== null) return 1;
       return 0;
     });
+  const umschalten = (id) => setGewaehlt((v) =>
+    v.includes(id) ? v.filter((x) => x !== id) : (v.length >= 3 ? v : [...v, id])
+  );
+  const auswahl = gewaehlt.map((id) => motoren.find((m) => m.id === id)).filter(Boolean);
+
   return (
     <div className="space-y-3">
+      {vergleichOffen && auswahl.length >= 2 && (
+        <MotorVergleich motoren={auswahl} onSchliessen={() => setVergleichOffen(false)} />
+      )}
+      <Card>
+        <h3 className="font-bold text-slate-100 mb-1">⚖️ Motoren vergleichen</h3>
+        <p className="text-xs text-slate-400 mb-3">Zwei oder drei Motoren auswählen – Unterschiede im Setup werden hervorgehoben.</p>
+        {motoren.length < 2 ? (
+          <p className="text-sm text-slate-400">Dafür brauchst du mindestens zwei angelegte Motoren.</p>
+        ) : (
+          <>
+            <div className="space-y-2 mb-3">
+              {motoren.map((m) => {
+                const an = gewaehlt.includes(m.id);
+                const voll = !an && gewaehlt.length >= 3;
+                return (
+                  <button key={m.id} onClick={() => umschalten(m.id)} disabled={voll}
+                    className={`w-full flex items-center gap-3 rounded-xl border-2 p-3 text-left ${an ? "bg-amber-400/15 border-amber-400" : "bg-slate-950/60 border-slate-700"} ${voll ? "opacity-40" : "active:bg-slate-800"}`}>
+                    <span className={`text-xl leading-none ${an ? "text-amber-300" : "text-slate-600"}`}>{an ? "☑" : "☐"}</span>
+                    <span className="flex-1">
+                      <span className="block font-bold text-slate-100">{m.name}</span>
+                      <span className="block text-xs text-slate-400 tabular-nums">
+                        {m.topspeed ? m.topspeed + " km/h" : "kein Topspeed"} · {fmt(standOf(m.motor))} L
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setVergleichOffen(true)} disabled={auswahl.length < 2}
+              className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300 disabled:opacity-40">
+              {auswahl.length < 2 ? "Mindestens 2 Motoren wählen" : "Auswertung anzeigen (" + auswahl.length + ")"}
+            </button>
+          </>
+        )}
+      </Card>
       <Card className="py-2">
         <p className="text-xs text-slate-300">Reihenfolge: <span className="font-bold text-amber-300">1. Topspeed</span> → <span className="font-bold text-amber-300">2. Durchzug</span> → <span className="font-bold text-amber-300">3. Bestzeit</span></p>
       </Card>
@@ -1232,8 +1370,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.3";
+const VERSION = "2.4";
 const NEUERUNGEN = [
+  ["2.4", [
+    "Neu in der Rangliste: Motoren-Vergleich für zwei oder drei Motoren.",
+    "Unterschiede im Setup werden dabei automatisch gelb hervorgehoben.",
+    "Verpasste Updates werden jetzt vollständig angezeigt, nicht nur das neueste.",
+  ]],
   ["2.3", [
     "Favoriten: Motoren lassen sich in der Motorenliste mit ★ markieren.",
     "Im Dashboard erscheinen nur noch favorisierte Motoren in der Schnellauswahl.",
@@ -1257,15 +1400,31 @@ const NEUERUNGEN = [
   ]],
 ];
 
-function NeuerungenHinweis({ onSchliessen }) {
-  const eintrag = NEUERUNGEN[0];
+function NeuerungenHinweis({ seitVersion, onSchliessen }) {
+  // Zeigt alle Versionen, die seit dem letzten Öffnen dazugekommen sind
+  let bis = 1;
+  if (seitVersion) {
+    const idx = NEUERUNGEN.findIndex(([v]) => v === seitVersion);
+    bis = idx === -1 ? NEUERUNGEN.length : idx;
+  }
+  const eintraege = NEUERUNGEN.slice(0, Math.max(1, bis));
+  const mehrere = eintraege.length > 1;
   return (
-    <div className="fixed inset-0 z-30 bg-slate-950/90 flex items-end justify-center p-4">
+    <div className="fixed inset-0 z-30 bg-slate-950/90 flex items-end justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-md bg-slate-900 border-2 border-amber-400/60 rounded-2xl p-4 mb-20">
-        <h3 className="text-lg font-extrabold text-amber-300 mb-1">🎉 Neu in Version {eintrag[0]}</h3>
-        <ul className="text-sm text-slate-200 space-y-2 my-3">
-          {eintrag[1].map((z, i) => <li key={i} className="flex gap-2"><span className="text-amber-400">•</span><span>{z}</span></li>)}
-        </ul>
+        <h3 className="text-lg font-extrabold text-amber-300 mb-1">
+          🎉 {mehrere ? "Das ist neu seit deinem letzten Update" : "Neu in Version " + eintraege[0][0]}
+        </h3>
+        <div className="max-h-80 overflow-y-auto my-3">
+          {eintraege.map(([v, zeilen]) => (
+            <div key={v} className="mb-3">
+              {mehrere && <div className="text-xs font-bold text-amber-400 mb-1">Version {v}</div>}
+              <ul className="text-sm text-slate-200 space-y-2">
+                {zeilen.map((z, i) => <li key={i} className="flex gap-2"><span className="text-amber-400">•</span><span>{z}</span></li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
         <button onClick={onSchliessen}
           className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">Alles klar</button>
       </div>
@@ -1774,6 +1933,7 @@ function App() {
   const [editAutoId, setEditAutoId] = useState(null);
   const [tourOffen, setTourOffen] = useState(false);
   const [neuHinweis, setNeuHinweis] = useState(false);
+  const [letzteVersion, setLetzteVersion] = useState("");
   const [gast, setGast] = useState(null);
   const [gastName, setGastName] = useState("");
   const imGast = gast !== null;
@@ -1790,7 +1950,8 @@ function App() {
         setData(seedData());
       }
       try {
-        if (localStorage.getItem("vg8-version") !== VERSION) setNeuHinweis(true);
+        const gemerkt = localStorage.getItem("vg8-version");
+        if (gemerkt !== VERSION) { setLetzteVersion(gemerkt || ""); setNeuHinweis(true); }
       } catch { /* ohne Speicher kein Hinweis */ }
       loaded.current = true;
     })();
@@ -1852,7 +2013,7 @@ function App() {
         <h1 className="font-extrabold uppercase italic tracking-wider text-lg flex items-center gap-2">🏁 Nitro Service <span className="text-xs font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5 not-italic">{VERSION}</span></h1>
         <span className="text-xs text-amber-300">{saveState}</span>
       </header>
-      {neuHinweis && <NeuerungenHinweis onSchliessen={() => {
+      {neuHinweis && <NeuerungenHinweis seitVersion={letzteVersion} onSchliessen={() => {
         setNeuHinweis(false);
         try { localStorage.setItem("vg8-version", VERSION); } catch { /* egal */ }
       }} />}
