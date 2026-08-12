@@ -84,6 +84,26 @@ function findeArrays(obj, tiefe) {
   return out;
 }
 
+const profilUrl = (worker) => worker.replace(/\/+$/, "") + "/profil";
+
+async function profilHochladen(worker, code, passwort, name, daten) {
+  const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ passwort, name, daten }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
+  return j;
+}
+
+async function profilAbrufen(worker, code, passwort) {
+  const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code) + "&passwort=" + encodeURIComponent(passwort));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
+  return j;
+}
+
 function datumUhrzeitVon(e) {
   // Speedhive rechnet Zeiten auf die Zeitzone des Betrachters um - genauso machen wir es.
   if (!e) return null;
@@ -383,6 +403,7 @@ const seedData = () => ({
     kz: { max: 4, gelb: 1 },
   },
   pruef: { kerze: 1, kruemmer: 2 },
+  freigabe: { aktiv: false, code: "", passwort: "", name: "" },
 });
 
 const KZ_DEFAULT = () => ({ reset: "2020-01-01", start: 0, note: "", checkedAt: 0 });
@@ -391,6 +412,7 @@ const normalizeData = (d) => {
   const out = { ...base, ...d };
   out.settings = { ...base.settings, ...(d.settings || {}) };
   out.pruef = { ...base.pruef, ...(d.pruef || {}) };
+  out.freigabe = { ...base.freigabe, ...(d.freigabe || {}) };
   const f = d.fahrten || [];
   const summe = (feld, id, abDatum) => f
     .filter((x) => x[feld] === id && (!abDatum || x.datum >= abDatum))
@@ -1388,8 +1410,14 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.7";
+const VERSION = "2.8";
 const NEUERUNGEN = [
+  ["2.8", [
+    "Neu: Live-Profile! Gib deinen Freunden Code und Passwort – sie sehen dann immer deinen aktuellen Stand.",
+    "Unter „Mehr“ → „Profile“ kannst du dein Profil freigeben oder das eines Freundes live öffnen.",
+    "Bei aktiver Freigabe wird dein Stand nach jeder Änderung automatisch hochgeladen.",
+    "Gast-Ansichten bleiben schreibgeschützt – Änderungen sind dort nicht möglich.",
+  ]],
   ["2.7", [
     "Notizen zum Motor stehen jetzt als eigener Block direkt unter dem Motornamen.",
     "Das doppelte Notizfeld unten bei „Setup & Notizen“ ist entfallen – die Bauteil-Gruppen haben ja eigene Notizen.",
@@ -1723,11 +1751,19 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   );
 }
 
-function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour, imGast, gastName, onGastLaden, onGastBeenden }) {
+function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour, imGast, gastName, onGastLaden, onGastBeenden, onLiveVerbinden, gastLive }) {
   const [showBackup, setShowBackup] = useState(false);
   const [offen, setOffen] = useState("");
   const [gastText, setGastText] = useState("");
   const [gastMsg, setGastMsg] = useState("");
+  const [liveCode, setLiveCode] = useState("");
+  const [livePw, setLivePw] = useState("");
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [teilenOffen, setTeilenOffen] = useState(false);
+  const fg = fullData.freigabe || {};
+  const [fgCode, setFgCode] = useState(fg.code || "");
+  const [fgPw, setFgPw] = useState(fg.passwort || "");
+  const [fgName, setFgName] = useState(fg.name || "");
   const [restoreText, setRestoreText] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
   const backupString = JSON.stringify(fullData);
@@ -1810,7 +1846,95 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
           </>
         ) : (
           <>
-            <p className="text-xs text-slate-400 mb-3">Sicherungsdatei eines Freundes laden und seine Motoren, Zeiten und Wartungsstände anschauen. Deine eigenen Daten bleiben unverändert.</p>
+            <div className="border-2 border-sky-400/40 rounded-xl p-3 mb-4">
+              <p className="text-sm font-bold text-sky-300 mb-1">🔴 Live-Profil öffnen</p>
+              <p className="text-[11px] text-slate-400 mb-2">Code und Passwort eines Freundes eingeben – du siehst danach immer seinen aktuellen Stand.</p>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input placeholder="Code" className={inputCls} value={liveCode}
+                  onChange={(e) => setLiveCode(e.target.value.toUpperCase())} />
+                <input placeholder="Passwort" className={inputCls} value={livePw}
+                  onChange={(e) => setLivePw(e.target.value)} />
+              </div>
+              <button disabled={liveBusy || !liveCode.trim() || !livePw.trim()}
+                onClick={async () => {
+                  setLiveBusy(true); setGastMsg("Verbinde …");
+                  try {
+                    const res = await profilAbrufen(WORKER_STANDARD, liveCode.trim(), livePw.trim());
+                    setGastMsg("");
+                    onLiveVerbinden(res.daten, res.name || liveCode.trim(), liveCode.trim(), livePw.trim(), res.stand);
+                  } catch (e) {
+                    setGastMsg("❌ " + String(e.message || e));
+                    setTimeout(() => setGastMsg(""), 5000);
+                  }
+                  setLiveBusy(false);
+                }}
+                className="w-full rounded-xl bg-sky-400 text-slate-950 font-bold py-3 active:bg-sky-300 disabled:opacity-40">
+                {liveBusy ? "Verbinde …" : "Live-Profil öffnen"}
+              </button>
+            </div>
+
+            <div className="border-2 border-emerald-400/40 rounded-xl p-3 mb-4">
+              <button onClick={() => setTeilenOffen(!teilenOffen)} className="w-full flex items-center gap-2 text-left">
+                <span className="flex-1">
+                  <span className="block text-sm font-bold text-emerald-300">📡 Mein Profil freigeben</span>
+                  <span className="block text-[11px] text-slate-400">
+                    {fg.aktiv ? "Aktiv – Code: " + fg.code : "Freunde können deinen Stand live mitverfolgen"}
+                  </span>
+                </span>
+                <span className={`text-lg ${teilenOffen ? "text-emerald-300" : "text-slate-500"}`}>{teilenOffen ? "▲" : "▼"}</span>
+              </button>
+              {teilenOffen && (
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-400 mb-2">Dein Name (wird dem Freund angezeigt)
+                    <input className={`${inputCls} mt-1`} placeholder="z. B. Pascal" value={fgName} onChange={(e) => setFgName(e.target.value)} />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <label className="text-xs text-slate-400">Code
+                      <input className={`${inputCls} mt-1`} placeholder="z. B. PASCAL1" value={fgCode}
+                        onChange={(e) => setFgCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+                    </label>
+                    <label className="text-xs text-slate-400">Passwort
+                      <input className={`${inputCls} mt-1`} placeholder="min. 4 Zeichen" value={fgPw}
+                        onChange={(e) => setFgPw(e.target.value)} />
+                    </label>
+                  </div>
+                  {fg.aktiv ? (
+                    <div className="flex gap-2">
+                      <button onClick={async () => {
+                          setLiveBusy(true); setGastMsg("Lade hoch …");
+                          try {
+                            await profilHochladen(WORKER_STANDARD, fgCode.trim(), fgPw.trim(), fgName.trim(), fullData);
+                            up({ freigabe: { aktiv: true, code: fgCode.trim(), passwort: fgPw.trim(), name: fgName.trim() } });
+                            setGastMsg("✓ Aktualisiert");
+                          } catch (e) { setGastMsg("❌ " + String(e.message || e)); }
+                          setTimeout(() => setGastMsg(""), 4000); setLiveBusy(false);
+                        }}
+                        disabled={liveBusy}
+                        className="flex-1 rounded-xl bg-emerald-400 text-slate-950 font-bold py-2.5 text-sm active:bg-emerald-300 disabled:opacity-40">Jetzt hochladen</button>
+                      <button onClick={() => up({ freigabe: { aktiv: false, code: fg.code, passwort: fg.passwort, name: fg.name } })}
+                        className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2.5 text-sm active:bg-slate-800">Freigabe stoppen</button>
+                    </div>
+                  ) : (
+                    <button disabled={liveBusy || fgCode.trim().length < 4 || fgPw.trim().length < 4}
+                      onClick={async () => {
+                        setLiveBusy(true); setGastMsg("Richte Freigabe ein …");
+                        try {
+                          await profilHochladen(WORKER_STANDARD, fgCode.trim(), fgPw.trim(), fgName.trim(), fullData);
+                          up({ freigabe: { aktiv: true, code: fgCode.trim(), passwort: fgPw.trim(), name: fgName.trim() } });
+                          setGastMsg("✓ Freigabe aktiv! Gib Code und Passwort an deine Freunde weiter.");
+                        } catch (e) { setGastMsg("❌ " + String(e.message || e)); }
+                        setTimeout(() => setGastMsg(""), 6000); setLiveBusy(false);
+                      }}
+                      className="w-full rounded-xl bg-emerald-400 text-slate-950 font-bold py-3 active:bg-emerald-300 disabled:opacity-40">
+                      Freigabe starten
+                    </button>
+                  )}
+                  <p className="text-[11px] text-slate-400 mt-2">Bei aktiver Freigabe wird dein Stand nach jeder Änderung automatisch hochgeladen.</p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-400 mb-3">Oder eine Sicherungsdatei eines Freundes laden – zeigt den Stand von damals, ohne Verbindung.</p>
             {gastMsg && <p className="text-sm font-semibold text-sky-300 mb-2">{gastMsg}</p>}
             <label className="block mb-2">
               <input type="file" accept="application/json,.json,.txt" className="hidden"
@@ -1966,6 +2090,7 @@ function App() {
   const [letzteVersion, setLetzteVersion] = useState("");
   const [gast, setGast] = useState(null);
   const [gastName, setGastName] = useState("");
+  const [gastLive, setGastLive] = useState(null);
   const imGast = gast !== null;
   const [saveState, setSaveState] = useState("");
   const saveTimer = useRef(null);
@@ -1997,6 +2122,14 @@ function App() {
         setTimeout(() => setSaveState(""), 1500);
       } catch {
         setSaveState("Speichern fehlgeschlagen");
+      }
+      const fg = data.freigabe;
+      if (fg && fg.aktiv && fg.code && fg.passwort) {
+        try {
+          await profilHochladen(WORKER_STANDARD, fg.code, fg.passwort, fg.name, data);
+          setSaveState("Freigabe aktualisiert");
+          setTimeout(() => setSaveState(""), 1500);
+        } catch { /* offline oder Fehler - beim naechsten Mal wieder */ }
       }
     }, 500);
   }, [data]);
@@ -2050,9 +2183,24 @@ function App() {
       }} />}
       {imGast && (
         <div className="bg-sky-500/15 border-b border-sky-400/40 px-4 py-2 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-sky-200">👤 Gast-Ansicht{gastName ? ": " + gastName : ""} · nur lesen</span>
-          <button onClick={() => { setGast(null); setGastName(""); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
-            className="shrink-0 text-xs font-bold rounded-xl bg-sky-400 text-slate-950 px-3 py-1.5 active:bg-sky-300">Zurück zu meinen Daten</button>
+          <span className="text-xs font-bold text-sky-200">
+            {gastLive ? "🔴 Live" : "👤 Gast"}: {gastName || "Gast"} · nur lesen
+            {gastLive && gastLive.stand ? " · Stand " + fmtDate(String(gastLive.stand).slice(0, 10)) + " " + String(gastLive.stand).slice(11, 16) : ""}
+          </span>
+          <div className="flex gap-2 shrink-0">
+            {gastLive && (
+              <button onClick={async () => {
+                  try {
+                    const res = await profilAbrufen(WORKER_STANDARD, gastLive.code, gastLive.passwort);
+                    setGast(normalizeData(res.daten)); setGastName(res.name || gastName);
+                    setGastLive({ ...gastLive, stand: res.stand });
+                  } catch { /* offline */ }
+                }}
+                className="text-xs font-bold rounded-xl border border-sky-400 text-sky-200 px-3 py-1.5 active:bg-sky-400/20">↻</button>
+            )}
+            <button onClick={() => { setGast(null); setGastName(""); setGastLive(null); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
+              className="text-xs font-bold rounded-xl bg-sky-400 text-slate-950 px-3 py-1.5 active:bg-sky-300">Zurück</button>
+          </div>
         </div>
       )}
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
@@ -2068,7 +2216,12 @@ function App() {
           onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)}
           imGast={imGast} gastName={gastName}
           onGastLaden={(d, name) => { setGast(normalizeData(d)); setGastName(name || "Gast"); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
-          onGastBeenden={() => { setGast(null); setGastName(""); setTab("start"); }} />}
+          onGastBeenden={() => { setGast(null); setGastName(""); setGastLive(null); setTab("start"); }}
+          gastLive={gastLive}
+          onLiveVerbinden={(daten, name, code, passwort, stand) => {
+            setGast(normalizeData(daten)); setGastName(name); setGastLive({ code, passwort, stand });
+            setTab("start"); setEditMotorId(null); setEditAutoId(null);
+          }} />}
       </main>
       <nav className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-700/60 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map(([key, label, icon]) => (
