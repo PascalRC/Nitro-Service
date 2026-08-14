@@ -1416,9 +1416,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.1";
+const VERSION = "3.2";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["3.2", [
+    "Passwortfelder zeigen den eingegebenen Text wieder normal an (kein Punkte-Verbergen mehr).",
+    "Der Schutz vor iPhone-Autogroßschreibung bleibt dabei bestehen.",
+  ]],
   ["3.1", [
     "Profile-Bereich komplett aufgeräumt: Deine Freigabe steht jetzt immer oben mit klarem Status (grün = aktiv).",
     "Der Reiter „Profile“ zeigt direkt an, ob deine Freigabe läuft, ohne ihn zu öffnen.",
@@ -1897,7 +1901,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                       onChange={(e) => setFgCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
                   </label>
                   <label className="block text-xs text-slate-400 mb-3">Passwort – min. 4 Zeichen
-                    <input type="password" className={`${inputCls} mt-1`} value={fgPw}
+                    <input type="text" className={`${inputCls} mt-1`} value={fgPw}
                       autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
                       onChange={(e) => setFgPw(e.target.value)} />
                   </label>
@@ -1969,7 +1973,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <input placeholder="Code" className={inputCls} value={liveCode}
                     onChange={(e) => setLiveCode(e.target.value.toUpperCase())} />
-                  <input type="password" placeholder="Passwort" className={inputCls} value={livePw}
+                  <input type="text" placeholder="Passwort" className={inputCls} value={livePw}
                     autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
                     onChange={(e) => setLivePw(e.target.value)} />
                 </div>
