@@ -1416,8 +1416,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "2.9";
+const VERSION = "3.0";
 const NEUERUNGEN = [
+  ["3.0", [
+    "Wichtiger Fehler behoben: Passwortfelder bei Live-Profilen konnten vom iPhone automatisch großgeschrieben werden – das führte dazu, dass gestern gespeicherte Passwörter heute nicht mehr passten.",
+    "Passwortfelder sind jetzt maskiert (Punkte statt Klartext), mit einem Augen-Symbol zum kurzen Anzeigen.",
+    "Falls dein Profil dadurch nicht mehr erreichbar ist: einfach unter „Mein Profil freigeben“ einen neuen Code vergeben.",
+  ]],
   ["2.9", [
     "Der Aktualisieren-Knopf im Live-Profil holt jetzt zuverlässig den neuesten Stand – vorher konnte der Browser eine alte Antwort liefern.",
     "Profile deiner Freunde bleiben gespeichert: einmal hinzufügen, danach mit einem Tipp öffnen.",
@@ -1774,6 +1779,8 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
   const [fgCode, setFgCode] = useState(fg.code || "");
   const [fgPw, setFgPw] = useState(fg.passwort || "");
   const [fgName, setFgName] = useState(fg.name || "");
+  const [zeigeLivePw, setZeigeLivePw] = useState(false);
+  const [zeigeFgPw, setZeigeFgPw] = useState(false);
   const [restoreText, setRestoreText] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
   const backupString = JSON.stringify(fullData);
@@ -1895,8 +1902,13 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <input placeholder="Code" className={inputCls} value={liveCode}
                   onChange={(e) => setLiveCode(e.target.value.toUpperCase())} />
-                <input placeholder="Passwort" className={inputCls} value={livePw}
-                  onChange={(e) => setLivePw(e.target.value)} />
+                <div className="relative">
+                  <input type={zeigeLivePw ? "text" : "password"} placeholder="Passwort" className={`${inputCls} pr-10`} value={livePw}
+                    autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
+                    onChange={(e) => setLivePw(e.target.value)} />
+                  <button type="button" onClick={() => setZeigeLivePw(!zeigeLivePw)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold px-1">{zeigeLivePw ? "🙈" : "👁"}</button>
+                </div>
               </div>
               <button disabled={liveBusy || !liveCode.trim() || !livePw.trim()}
                 onClick={async () => {
@@ -1941,8 +1953,13 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                         onChange={(e) => setFgCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
                     </label>
                     <label className="text-xs text-slate-400">Passwort
-                      <input className={`${inputCls} mt-1`} placeholder="min. 4 Zeichen" value={fgPw}
-                        onChange={(e) => setFgPw(e.target.value)} />
+                      <div className="relative mt-1">
+                        <input type={zeigeFgPw ? "text" : "password"} className={`${inputCls} pr-10`} placeholder="min. 4 Zeichen" value={fgPw}
+                          autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
+                          onChange={(e) => setFgPw(e.target.value)} />
+                        <button type="button" onClick={() => setZeigeFgPw(!zeigeFgPw)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold px-1">{zeigeFgPw ? "🙈" : "👁"}</button>
+                      </div>
                     </label>
                   </div>
                   {fg.aktiv ? (
