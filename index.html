@@ -1505,9 +1505,14 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.5";
+const VERSION = "3.6";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["3.6", [
+    "Neuer Knopf „Freigabe prüfen“: lädt dein Profil hoch und ruft es danach so ab, wie es ein Freund tut.",
+    "Fehler werden jetzt im Klartext angezeigt, statt immer „Profil nicht gefunden“ zu behaupten.",
+    "Wenn das automatische Hochladen scheitert, steht das jetzt oben in der Kopfzeile.",
+  ]],
   ["3.5", [
     "Wer ein Profil über einen Link öffnet, sieht jetzt oben den Code mit einem „Kopieren“-Knopf.",
     "Neu unter „Freund hinzufügen“: „Link einfügen und öffnen“ – einmal tippen, fertig.",
@@ -1953,6 +1958,21 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
     oeffneCode(text);
   };
 
+  // Einmal hochladen und danach so abrufen, wie es ein Freund tun wuerde
+  const freigabePruefen = async () => {
+    setLiveBusy(true); setGastMsg("Prüfe Freigabe …");
+    try {
+      await profilHochladen(WORKER_STANDARD, fg.code, fg.schluessel, (fg.name || "").trim(), fullData);
+      const res = await profilAbrufen(WORKER_STANDARD, fg.code);
+      const stand = String(res.stand || "");
+      setGastMsg("✓ Dein Profil ist online – Stand " + fmtDate(stand.slice(0, 10)) + " " + stand.slice(11, 16));
+    } catch (e) {
+      setGastMsg("❌ " + String(e.message || e) + " – läuft beim Worker schon die neue Fassung?");
+    }
+    setTimeout(() => setGastMsg(""), 12000);
+    setLiveBusy(false);
+  };
+
   // Teilen ueber das normale iPhone-Teilen-Fenster (WhatsApp, Nachrichten, …)
   const teilen = async () => {
     const link = teilenLink(fg.code);
@@ -2107,6 +2127,8 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                   <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <span className="text-[11px] text-slate-500">Code: <span className="font-bold text-slate-300">{fg.code}</span></span>
                     <button onClick={linkKopieren} className="text-[11px] font-semibold text-sky-300 active:text-sky-200">Link kopieren</button>
+                    <button disabled={liveBusy} onClick={freigabePruefen}
+                      className="text-[11px] font-semibold text-sky-300 active:text-sky-200 disabled:opacity-40">Freigabe prüfen</button>
                     <ConfirmButton label="Neuer Link" confirmLabel="Alter wird ungültig – sicher?"
                       onConfirm={neuerLink} className="text-[11px] font-semibold text-slate-400" />
                   </div>
@@ -2369,9 +2391,10 @@ function App() {
         // Im Safari-Fenster ist das nur ein Besuch - der Freund landet nicht in der App
         // auf dem Home-Bildschirm. Darum den Code gross anzeigen und zum Kopieren anbieten.
         if (!imHomescreen()) setLinkHinweis(code);
-      } catch {
-        setGastStatus("Profil nicht gefunden – vielleicht wurde die Freigabe beendet.");
-        setTimeout(() => setGastStatus(""), 8000);
+      } catch (e) {
+        // Klartext statt Ratespiel: hier steht, was der Server wirklich gesagt hat
+        setGastStatus("Profil ließ sich nicht öffnen: " + String(e.message || e));
+        setTimeout(() => setGastStatus(""), 12000);
       }
       setGastLaedt(false);
     })();
@@ -2394,7 +2417,11 @@ function App() {
           await profilHochladen(WORKER_STANDARD, fg.code, fg.schluessel, fg.name, data);
           setSaveState("Freigabe aktualisiert");
           setTimeout(() => setSaveState(""), 1500);
-        } catch { /* offline oder Fehler - beim naechsten Mal wieder */ }
+        } catch {
+          // Frueher still verschluckt - dann sah die Freigabe aktiv aus, war es aber nicht
+          setSaveState("⚠️ Freigabe nicht hochgeladen");
+          setTimeout(() => setSaveState(""), 5000);
+        }
       }
     }, 500);
   }, [data]);
