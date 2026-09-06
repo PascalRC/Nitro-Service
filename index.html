@@ -158,22 +158,33 @@ function ohneZugangsdaten(daten) {
 // Der Schluessel ist unsichtbar und liegt nur auf dem eigenen Geraet.
 // Er sorgt dafuer, dass niemand sonst unter deinem Code etwas hochladen kann.
 async function profilHochladen(worker, code, schluessel, name, daten) {
-  const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ schluessel, name, daten: ohneZugangsdaten(daten) }),
-  });
+  let r;
+  try {
+    r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schluessel, name, daten: ohneZugangsdaten(daten) }),
+    });
+  } catch (e) {
+    throw new Error("Hochladen: keine Verbindung zum Worker (" + String(e.message || e) + ")");
+  }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
   return j;
 }
 
 async function profilAbrufen(worker, code) {
-  // Zeitstempel + no-store verhindern, dass der Browser eine alte Antwort liefert
-  const r = await fetch(
-    profilUrl(worker) + "?code=" + encodeURIComponent(code) + "&_=" + Date.now(),
-    { cache: "no-store", headers: { "Cache-Control": "no-cache" } }
-  );
+  // Der Zeitstempel reicht gegen alte Antworten. Eine eigene Cache-Control-Kopfzeile
+  // NICHT setzen - Safari fragt sonst vorher beim Worker um Erlaubnis und bricht ab.
+  let r;
+  try {
+    r = await fetch(
+      profilUrl(worker) + "?code=" + encodeURIComponent(code) + "&_=" + Date.now(),
+      { cache: "no-store" }
+    );
+  } catch (e) {
+    throw new Error("Abrufen: keine Verbindung zum Worker (" + String(e.message || e) + ")");
+  }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
   return j;
@@ -1505,9 +1516,13 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.6";
+const VERSION = "3.7";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["3.7", [
+    "Fehler behoben: Das Abrufen fremder Profile wurde vom Browser blockiert („Load failed“) – jetzt kommt die Anfrage durch.",
+    "Verbindungsfehler sagen jetzt dazu, ob es beim Hochladen oder beim Abrufen klemmt.",
+  ]],
   ["3.6", [
     "Neuer Knopf „Freigabe prüfen“: lädt dein Profil hoch und ruft es danach so ab, wie es ein Freund tut.",
     "Fehler werden jetzt im Klartext angezeigt, statt immer „Profil nicht gefunden“ zu behaupten.",
