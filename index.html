@@ -94,6 +94,51 @@ function findeArrays(obj, tiefe) {
 
 const profilUrl = (worker) => worker.replace(/\/+$/, "") + "/profil";
 
+// Zufaelliger Code - lang genug, dass ihn niemand errraet. Ohne O/0/I/1 wegen Verwechslung.
+function neuerCode(laenge) {
+  const zeichen = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const n = laenge || 8;
+  let out = "";
+  try {
+    const zufall = new Uint32Array(n);
+    crypto.getRandomValues(zufall);
+    for (let i = 0; i < n; i++) out += zeichen[zufall[i] % zeichen.length];
+  } catch {
+    for (let i = 0; i < n; i++) out += zeichen[Math.floor(Math.random() * zeichen.length)];
+  }
+  return out;
+}
+
+// Link zum Verschicken: gleiche App-Adresse, hinten der Code
+function teilenLink(code) {
+  return location.origin + location.pathname + "#p=" + encodeURIComponent(code);
+}
+
+// Code aus allem herausfischen, was jemand einfuegt: ganzer Link oder nur der Code
+function codeAusText(text) {
+  const roh = String(text || "");
+  const treffer = roh.match(/p=([A-Za-z0-9]+)/);
+  return (treffer ? treffer[1] : roh).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+}
+
+// Laeuft die App vom Home-Bildschirm (dann ist alles gespeichert) oder nur im Safari-Fenster?
+function imHomescreen() {
+  try {
+    return window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  } catch { return false; }
+}
+
+// Steht ein Code in der Adresszeile? (aus einem geteilten Link)
+function codeAusLink() {
+  const treffer = String(location.hash || "").match(/p=([A-Za-z0-9]+)/);
+  if (treffer) return treffer[1].toUpperCase();
+  try {
+    const p = new URLSearchParams(location.search).get("p");
+    return p ? p.toUpperCase() : "";
+  } catch { return ""; }
+}
+
 function nurAnzeigedaten(daten) {
   // Gastdaten: fremde Zugangsdaten gar nicht erst uebernehmen
   const kopie = { ...(daten || {}) };
@@ -103,30 +148,44 @@ function nurAnzeigedaten(daten) {
 }
 
 function ohneZugangsdaten(daten) {
-  // Eigene Passwoerter und Freundesliste bleiben auf dem Geraet - sie werden nie hochgeladen
+  // Schluessel und Freundesliste bleiben auf dem Geraet - sie werden nie hochgeladen
   const kopie = { ...(daten || {}) };
   delete kopie.freunde;
   if (kopie.freigabe) kopie.freigabe = { aktiv: true, code: kopie.freigabe.code || "", name: kopie.freigabe.name || "" };
   return kopie;
 }
 
-async function profilHochladen(worker, code, passwort, name, daten) {
+// Der Schluessel ist unsichtbar und liegt nur auf dem eigenen Geraet.
+// Er sorgt dafuer, dass niemand sonst unter deinem Code etwas hochladen kann.
+async function profilHochladen(worker, code, schluessel, name, daten) {
   const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ passwort, name, daten: ohneZugangsdaten(daten) }),
+    body: JSON.stringify({ schluessel, name, daten: ohneZugangsdaten(daten) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
   return j;
 }
 
-async function profilAbrufen(worker, code, passwort) {
+async function profilAbrufen(worker, code) {
   // Zeitstempel + no-store verhindern, dass der Browser eine alte Antwort liefert
   const r = await fetch(
-    profilUrl(worker) + "?code=" + encodeURIComponent(code) + "&passwort=" + encodeURIComponent(passwort) + "&_=" + Date.now(),
+    profilUrl(worker) + "?code=" + encodeURIComponent(code) + "&_=" + Date.now(),
     { cache: "no-store", headers: { "Cache-Control": "no-cache" } }
   );
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
+  return j;
+}
+
+async function profilLoeschen(worker, code, schluessel) {
+  if (!code) return { ok: true };
+  const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ schluessel, loeschen: true }),
+  });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
   return j;
@@ -431,7 +490,7 @@ const seedData = () => ({
     kz: { max: 4, gelb: 1 },
   },
   pruef: { kerze: 1, kruemmer: 2 },
-  freigabe: { aktiv: false, code: "", passwort: "", name: "" },
+  freigabe: { aktiv: false, code: "", schluessel: "", name: "" },
   freunde: [],
 });
 
@@ -442,7 +501,13 @@ const normalizeData = (d) => {
   out.settings = { ...base.settings, ...(d.settings || {}) };
   out.pruef = { ...base.pruef, ...(d.pruef || {}) };
   out.freigabe = { ...base.freigabe, ...(d.freigabe || {}) };
-  out.freunde = Array.isArray(d.freunde) ? d.freunde : [];
+  delete out.freigabe.passwort; // Passwoerter gibt es nicht mehr
+  // Wer schon vor der Umstellung freigegeben hatte, bekommt jetzt einen Schluessel -
+  // sonst wuerde sein Profil stillschweigend nicht mehr aktualisiert
+  if (!out.freigabe.schluessel) out.freigabe.schluessel = neuerCode(24);
+  out.freunde = (Array.isArray(d.freunde) ? d.freunde : [])
+    .map((f) => ({ code: String(f.code || "").toUpperCase(), name: f.name || f.code || "" }))
+    .filter((f) => f.code);
   const f = d.fahrten || [];
   const summe = (feld, id, abDatum) => f
     .filter((x) => x[feld] === id && (!abDatum || x.datum >= abDatum))
@@ -1440,9 +1505,20 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.3";
+const VERSION = "3.5";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["3.5", [
+    "Wer ein Profil über einen Link öffnet, sieht jetzt oben den Code mit einem „Kopieren“-Knopf.",
+    "Neu unter „Freund hinzufügen“: „Link einfügen und öffnen“ – einmal tippen, fertig.",
+    "Das Code-Feld versteht jetzt auch den ganzen Link, nicht nur den Code.",
+  ]],
+  ["3.4", [
+    "Teilen ist jetzt kinderleicht: Schalter auf „Ja“, auf „Mein Profil teilen“ tippen und den Link per WhatsApp verschicken.",
+    "Keine Passwörter mehr – wer den Link antippt, sieht dein Profil sofort (nur zum Lesen).",
+    "Profile von Freunden bleiben wie bisher gespeichert und sind mit einem Tipp wieder offen.",
+    "Schalter auf „Nein“ beendet die Freigabe – der verschickte Link zeigt dann nichts mehr.",
+  ]],
   ["3.3", [
     "Freigabe-Einstellungen sind jetzt immer direkt sichtbar – der Bearbeiten-Umweg entfällt.",
     "Literangaben mit zwei Nachkommastellen: 0,05 L wird nicht mehr auf 0,1 gerundet.",
@@ -1811,14 +1887,107 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
   const [offen, setOffen] = useState("");
   const [gastMsg, setGastMsg] = useState("");
   const [liveCode, setLiveCode] = useState("");
-  const [livePw, setLivePw] = useState("");
   const [liveBusy, setLiveBusy] = useState(false);
   const [hinzufuegenOffen, setHinzufuegenOffen] = useState(false);
   const [dateiOffen, setDateiOffen] = useState(false);
   const fg = fullData.freigabe || {};
-  const [fgCode, setFgCode] = useState(fg.code || "");
-  const [fgPw, setFgPw] = useState(fg.passwort || "");
-  const [fgName, setFgName] = useState(fg.name || "");
+
+  // Freigabe an- oder ausschalten. Code und Schluessel entstehen beim ersten Mal von selbst.
+  const setzeFreigabe = async (an) => {
+    setLiveBusy(true);
+    if (an) {
+      const code = fg.code || neuerCode(8);
+      const schluessel = fg.schluessel || neuerCode(24);
+      setGastMsg("Richte Freigabe ein …");
+      try {
+        await profilHochladen(WORKER_STANDARD, code, schluessel, (fg.name || "").trim(), fullData);
+        up({ freigabe: { aktiv: true, code, schluessel, name: (fg.name || "").trim() } });
+        setGastMsg("✓ Freigabe aktiv – jetzt den Link verschicken");
+      } catch (e) { setGastMsg("❌ " + String(e.message || e)); }
+    } else {
+      setGastMsg("Beende Freigabe …");
+      try { await profilLoeschen(WORKER_STANDARD, fg.code, fg.schluessel); } catch { /* offline: dann beim naechsten Mal */ }
+      up({ freigabe: { ...fg, aktiv: false } });
+      setGastMsg("Freigabe beendet – der Link zeigt nichts mehr.");
+    }
+    setTimeout(() => setGastMsg(""), 6000);
+    setLiveBusy(false);
+  };
+
+  // Ein Freund, ein Weg: Code (oder ganzer Link) rein, Profil auf und gespeichert
+  const oeffneCode = async (roh) => {
+    const code = codeAusText(roh);
+    if (code.length < 4) {
+      setGastMsg("Da war kein Code drin – bitte den Link oder Code einfügen.");
+      setTimeout(() => setGastMsg(""), 5000);
+      return;
+    }
+    setLiveBusy(true); setGastMsg("Suche Profil …");
+    try {
+      const res = await profilAbrufen(WORKER_STANDARD, code);
+      up((d) => ({
+        freunde: [...(d.freunde || []).filter((x) => x.code !== code), { code, name: res.name || code }],
+      }));
+      setLiveCode(""); setGastMsg(""); setHinzufuegenOffen(false);
+      onLiveVerbinden(res.daten, res.name || code, code, res.stand);
+    } catch (e) {
+      setGastMsg("❌ " + String(e.message || e));
+      setTimeout(() => setGastMsg(""), 5000);
+    }
+    setLiveBusy(false);
+  };
+
+  // Ein Tipp: Link aus der Zwischenablage holen und direkt oeffnen
+  const ausZwischenablage = async () => {
+    let text = "";
+    try { text = await navigator.clipboard.readText(); } catch {
+      setGastMsg("Einfügen ging nicht – bitte den Code unten eintippen.");
+      setTimeout(() => setGastMsg(""), 6000);
+      return;
+    }
+    if (!codeAusText(text)) {
+      setGastMsg("In der Zwischenablage steckt kein Code.");
+      setTimeout(() => setGastMsg(""), 5000);
+      return;
+    }
+    oeffneCode(text);
+  };
+
+  // Teilen ueber das normale iPhone-Teilen-Fenster (WhatsApp, Nachrichten, …)
+  const teilen = async () => {
+    const link = teilenLink(fg.code);
+    const text = (fg.name ? fg.name + " teilt sein Nitro-Service-Profil: " : "Mein Nitro-Service-Profil: ") + link;
+    if (navigator.share) {
+      try { await navigator.share({ title: "Nitro Service", text }); return; } catch { /* abgebrochen */ }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setGastMsg("✓ Link kopiert – jetzt in WhatsApp einfügen");
+    } catch { setGastMsg(link); }
+    setTimeout(() => setGastMsg(""), 8000);
+  };
+
+  const linkKopieren = async () => {
+    const link = teilenLink(fg.code);
+    try { await navigator.clipboard.writeText(link); setGastMsg("✓ Link kopiert"); }
+    catch { setGastMsg(link); }
+    setTimeout(() => setGastMsg(""), 8000);
+  };
+
+  // Neuer Link, falls der alte in falsche Haende geraten ist
+  const neuerLink = async () => {
+    setLiveBusy(true); setGastMsg("Erzeuge neuen Link …");
+    const alterCode = fg.code, alterSchluessel = fg.schluessel;
+    const code = neuerCode(8), schluessel = neuerCode(24);
+    try {
+      await profilHochladen(WORKER_STANDARD, code, schluessel, (fg.name || "").trim(), fullData);
+      up({ freigabe: { aktiv: true, code, schluessel, name: (fg.name || "").trim() } });
+      try { await profilLoeschen(WORKER_STANDARD, alterCode, alterSchluessel); } catch { /* alter Eintrag bleibt liegen */ }
+      setGastMsg("✓ Neuer Link – der alte funktioniert nicht mehr");
+    } catch (e) { setGastMsg("❌ " + String(e.message || e)); }
+    setTimeout(() => setGastMsg(""), 6000);
+    setLiveBusy(false);
+  };
   const [restoreText, setRestoreText] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
   const backupString = JSON.stringify(fullData);
@@ -1903,47 +2072,48 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
           <>
             {gastMsg && <p className="text-sm font-semibold text-sky-300 mb-3">{gastMsg}</p>}
 
-            {/* Meine Freigabe: Felder immer sichtbar */}
+            {/* Mein Profil: Schalter + Teilen-Knopf */}
             <div className={`rounded-xl p-3 mb-4 ${fg.aktiv ? "bg-emerald-400/10 border-2 border-emerald-400" : "bg-slate-950/60 border-2 border-slate-700"}`}>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl leading-none">{fg.aktiv ? "🟢" : "⚪️"}</span>
-                <span className="font-bold text-slate-100">Mein Profil</span>
+                <span className="font-bold text-slate-100">Mein Profil teilen</span>
                 {fg.aktiv && <span className="ml-auto text-xs font-bold text-emerald-300">aktiv</span>}
               </div>
-              <label className="block text-xs text-slate-400 mb-2">Dein Name
-                <input className={`${inputCls} mt-1`} placeholder="z. B. Pascal" value={fgName}
-                  onChange={(e) => setFgName(e.target.value)} />
+
+              <label className="block text-xs text-slate-400 mb-3">Dein Name – so tauchst du bei deinen Freunden auf
+                <input className={`${inputCls} mt-1`} placeholder="z. B. Pascal" value={fg.name || ""}
+                  onChange={(e) => up((d) => ({ freigabe: { ...(d.freigabe || {}), name: e.target.value } }))} />
               </label>
-              <label className="block text-xs text-slate-400 mb-2">Code – frei wählbar
-                <input className={`${inputCls} mt-1`} placeholder="z. B. PASCAL1" value={fgCode}
-                  autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
-                  onChange={(e) => setFgCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
-              </label>
-              <label className="block text-xs text-slate-400 mb-3">Passwort – min. 4 Zeichen
-                <input type="text" className={`${inputCls} mt-1`} value={fgPw}
-                  autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
-                  onChange={(e) => setFgPw(e.target.value)} />
-              </label>
-              <div className="flex gap-2">
-                <button disabled={liveBusy || fgCode.trim().length < 4 || fgPw.trim().length < 4}
-                  onClick={async () => {
-                    setLiveBusy(true); setGastMsg(fg.aktiv ? "Speichere …" : "Richte Freigabe ein …");
-                    try {
-                      await profilHochladen(WORKER_STANDARD, fgCode.trim(), fgPw.trim(), fgName.trim(), fullData);
-                      up({ freigabe: { aktiv: true, code: fgCode.trim(), passwort: fgPw.trim(), name: fgName.trim() } });
-                      setGastMsg(fg.aktiv ? "✓ Gespeichert und hochgeladen" : "✓ Freigabe aktiv! Code und Passwort weitergeben.");
-                    } catch (e) { setGastMsg("❌ " + String(e.message || e)); }
-                    setTimeout(() => setGastMsg(""), 6000); setLiveBusy(false);
-                  }}
-                  className="flex-1 rounded-xl bg-emerald-400 text-slate-950 font-bold py-3 active:bg-emerald-300 disabled:opacity-40">
-                  {liveBusy ? "…" : (fg.aktiv ? "Speichern & hochladen" : "Freigabe starten")}
-                </button>
-                {fg.aktiv && (
-                  <button onClick={() => up({ freigabe: { aktiv: false, code: fg.code, passwort: fg.passwort, name: fg.name } })}
-                    className="rounded-xl border border-slate-600 text-slate-300 font-semibold px-4 py-3 text-sm active:bg-slate-800">Stoppen</button>
-                )}
+
+              <div className="flex gap-2 mb-3">
+                {[["nein", false, "Nein"], ["ja", true, "Ja"]].map(([kennung, wert, beschriftung]) => (
+                  <button key={kennung} disabled={liveBusy}
+                    onClick={() => { if (wert !== !!fg.aktiv) setzeFreigabe(wert); }}
+                    className={`flex-1 rounded-xl py-2.5 text-sm font-bold disabled:opacity-40 ${!!fg.aktiv === wert ? "bg-emerald-400 text-slate-950" : "border border-slate-600 text-slate-300 active:bg-slate-800"}`}>
+                    {liveBusy && wert !== !!fg.aktiv ? "…" : beschriftung}
+                  </button>
+                ))}
               </div>
-              {fg.aktiv && <p className="text-[11px] text-slate-400 mt-2">Dein Stand wird nach jeder Änderung automatisch hochgeladen.</p>}
+
+              {fg.aktiv ? (
+                <>
+                  <button disabled={liveBusy} onClick={teilen}
+                    className="w-full rounded-xl bg-emerald-400 text-slate-950 font-bold py-3 active:bg-emerald-300 disabled:opacity-40">
+                    📤 Mein Profil teilen
+                  </button>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Verschick den Link per WhatsApp. Wer ihn antippt, sieht deinen aktuellen Stand – nur zum Lesen, ohne Passwort. Dein Stand wird nach jeder Änderung automatisch hochgeladen.
+                  </p>
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <span className="text-[11px] text-slate-500">Code: <span className="font-bold text-slate-300">{fg.code}</span></span>
+                    <button onClick={linkKopieren} className="text-[11px] font-semibold text-sky-300 active:text-sky-200">Link kopieren</button>
+                    <ConfirmButton label="Neuer Link" confirmLabel="Alter wird ungültig – sicher?"
+                      onConfirm={neuerLink} className="text-[11px] font-semibold text-slate-400" />
+                  </div>
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-400">Solange „Nein“ eingestellt ist, kann niemand dein Profil sehen.</p>
+              )}
             </div>
 
             {/* Freunde: eigene Karte pro Freund */}
@@ -1956,9 +2126,9 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                       onClick={async () => {
                         setLiveBusy(true); setGastMsg("Verbinde mit " + (f.name || f.code) + " …");
                         try {
-                          const res = await profilAbrufen(WORKER_STANDARD, f.code, f.passwort);
+                          const res = await profilAbrufen(WORKER_STANDARD, f.code);
                           setGastMsg("");
-                          onLiveVerbinden(res.daten, res.name || f.name || f.code, f.code, f.passwort, res.stand);
+                          onLiveVerbinden(res.daten, res.name || f.name || f.code, f.code, res.stand);
                         } catch (e) {
                           setGastMsg("❌ " + String(e.message || e));
                           setTimeout(() => setGastMsg(""), 5000);
@@ -1980,7 +2150,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               </>
             )}
 
-            {/* Freund hinzufügen: kompakt */}
+            {/* Freund hinzufügen: nur noch der Code */}
             {!hinzufuegenOffen ? (
               <button onClick={() => setHinzufuegenOffen(true)}
                 className="w-full rounded-xl border-2 border-sky-400/50 text-sky-300 font-bold py-3 text-sm active:bg-sky-400/10 mb-2">
@@ -1988,32 +2158,19 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               </button>
             ) : (
               <div className="rounded-xl border-2 border-sky-400/50 p-3 mb-2">
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <input placeholder="Code" className={inputCls} value={liveCode}
-                    onChange={(e) => setLiveCode(e.target.value.toUpperCase())} />
-                  <input type="text" placeholder="Passwort" className={inputCls} value={livePw}
-                    autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
-                    onChange={(e) => setLivePw(e.target.value)} />
-                </div>
+                <p className="text-[11px] text-slate-400 mb-2">Link vom Freund kopiert? Dann reicht ein Tipp:</p>
+                <button disabled={liveBusy} onClick={ausZwischenablage}
+                  className="w-full rounded-xl bg-sky-400 text-slate-950 font-bold py-3 active:bg-sky-300 disabled:opacity-40 mb-3">
+                  {liveBusy ? "…" : "📋 Link einfügen und öffnen"}
+                </button>
+                <p className="text-[11px] text-slate-500 mb-1">oder Code von Hand eintragen</p>
+                <input placeholder="Code vom Freund" className={`${inputCls} mb-2`} value={liveCode}
+                  autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false}
+                  onChange={(e) => setLiveCode(codeAusText(e.target.value))} />
                 <div className="flex gap-2">
-                  <button disabled={liveBusy || !liveCode.trim() || !livePw.trim()}
-                    onClick={async () => {
-                      setLiveBusy(true); setGastMsg("Prüfe Zugang …");
-                      const code = liveCode.trim(), pw = livePw.trim();
-                      try {
-                        const res = await profilAbrufen(WORKER_STANDARD, code, pw);
-                        up((d) => ({
-                          freunde: [...(d.freunde || []).filter((x) => x.code !== code), { code, passwort: pw, name: res.name || code }],
-                        }));
-                        setLiveCode(""); setLivePw(""); setGastMsg(""); setHinzufuegenOffen(false);
-                        onLiveVerbinden(res.daten, res.name || code, code, pw, res.stand);
-                      } catch (e) {
-                        setGastMsg("❌ " + String(e.message || e));
-                        setTimeout(() => setGastMsg(""), 5000);
-                      }
-                      setLiveBusy(false);
-                    }}
-                    className="flex-1 rounded-xl bg-sky-400 text-slate-950 font-bold py-2.5 text-sm active:bg-sky-300 disabled:opacity-40">
+                  <button disabled={liveBusy || liveCode.trim().length < 4}
+                    onClick={() => oeffneCode(liveCode)}
+                    className="flex-1 rounded-xl border-2 border-sky-400/50 text-sky-300 font-bold py-2.5 text-sm active:bg-sky-400/10 disabled:opacity-40">
                     {liveBusy ? "…" : "Öffnen"}
                   </button>
                   <button onClick={() => setHinzufuegenOffen(false)}
@@ -2022,7 +2179,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               </div>
             )}
 
-            <button onClick={() => setDateiOffen(!dateiOffen)}
+                        <button onClick={() => setDateiOffen(!dateiOffen)}
               className="w-full text-[11px] text-slate-500 font-semibold py-2 active:text-slate-300">
               Alternativ: Sicherungsdatei laden {dateiOffen ? "▲" : "▼"}
             </button>
@@ -2166,10 +2323,12 @@ function App() {
   const [gastLive, setGastLive] = useState(null);
   const [gastLaedt, setGastLaedt] = useState(false);
   const [gastStatus, setGastStatus] = useState("");
+  const [linkHinweis, setLinkHinweis] = useState(""); // Code, der ueber einen Link kam
   const imGast = gast !== null;
   const [saveState, setSaveState] = useState("");
   const saveTimer = useRef(null);
   const loaded = useRef(false);
+  const linkErledigt = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -2188,6 +2347,36 @@ function App() {
     })();
   }, []);
 
+  // Geteilter Link (…#p=CODE): Profil des Freundes direkt oeffnen und merken
+  useEffect(() => {
+    if (!data || !loaded.current || linkErledigt.current) return;
+    const code = codeAusLink();
+    if (!code) return;
+    linkErledigt.current = true;
+    // Code aus der Adresszeile nehmen, damit beim naechsten Start die eigenen Daten kommen
+    try { history.replaceState(null, "", location.pathname + location.search); } catch { /* egal */ }
+    if (data.freigabe && data.freigabe.code === code) return; // eigener Link
+    (async () => {
+      setGastLaedt(true); setGastStatus("Profil wird geöffnet …");
+      try {
+        const res = await profilAbrufen(WORKER_STANDARD, code);
+        setData((d) => ({ ...d, freunde: [...((d && d.freunde) || []).filter((x) => x.code !== code), { code, name: res.name || code }] }));
+        setGast(normalizeData(nurAnzeigedaten(res.daten)));
+        setGastName(res.name || code);
+        setGastLive({ code, stand: res.stand });
+        setTab("start"); setEditMotorId(null); setEditAutoId(null);
+        setGastStatus("");
+        // Im Safari-Fenster ist das nur ein Besuch - der Freund landet nicht in der App
+        // auf dem Home-Bildschirm. Darum den Code gross anzeigen und zum Kopieren anbieten.
+        if (!imHomescreen()) setLinkHinweis(code);
+      } catch {
+        setGastStatus("Profil nicht gefunden – vielleicht wurde die Freigabe beendet.");
+        setTimeout(() => setGastStatus(""), 8000);
+      }
+      setGastLaedt(false);
+    })();
+  }, [data]);
+
   useEffect(() => {
     if (!data || !loaded.current) return;
     clearTimeout(saveTimer.current);
@@ -2200,9 +2389,9 @@ function App() {
         setSaveState("Speichern fehlgeschlagen");
       }
       const fg = data.freigabe;
-      if (fg && fg.aktiv && fg.code && fg.passwort) {
+      if (fg && fg.aktiv && fg.code && fg.schluessel) {
         try {
-          await profilHochladen(WORKER_STANDARD, fg.code, fg.passwort, fg.name, data);
+          await profilHochladen(WORKER_STANDARD, fg.code, fg.schluessel, fg.name, data);
           setSaveState("Freigabe aktualisiert");
           setTimeout(() => setSaveState(""), 1500);
         } catch { /* offline oder Fehler - beim naechsten Mal wieder */ }
@@ -2268,7 +2457,7 @@ function App() {
               <button disabled={gastLaedt} onClick={async () => {
                   setGastLaedt(true); setGastStatus("");
                   try {
-                    const res = await profilAbrufen(WORKER_STANDARD, gastLive.code, gastLive.passwort);
+                    const res = await profilAbrufen(WORKER_STANDARD, gastLive.code);
                     setGast(normalizeData(nurAnzeigedaten(res.daten))); setGastName(res.name || gastName);
                     setGastLive({ ...gastLive, stand: res.stand });
                     setGastStatus("aktualisiert");
@@ -2286,7 +2475,38 @@ function App() {
           </div>
         </div>
       )}
-      {imGast && gastStatus && (
+      {linkHinweis && (
+        <div className="bg-amber-400/15 border-b-2 border-amber-400 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <p className="flex-1 text-sm font-bold text-amber-200">Damit {gastName || "das Profil"} in deiner App bleibt</p>
+            <button onClick={() => setLinkHinweis("")}
+              className="text-amber-300 text-lg leading-none px-1">✕</button>
+          </div>
+          <p className="text-xs text-slate-300 mt-1 mb-2">
+            Dieses Fenster ist nur ein Besuch. Code kopieren und in deiner Nitro-Service-App einmal
+            unter „Mehr → Profile → Freund hinzufügen“ einfügen – danach ist {gastName || "das Profil"} dauerhaft dort.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-extrabold tracking-widest text-lg text-amber-300">{linkHinweis}</span>
+            <button onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(linkHinweis);
+                  setGastStatus("✓ Code kopiert – jetzt in der App einfügen");
+                } catch {
+                  setGastStatus("Kopieren ging nicht – Code bitte abtippen");
+                }
+                setTimeout(() => setGastStatus(""), 6000);
+              }}
+              className="rounded-xl bg-amber-400 text-slate-950 font-bold px-4 py-2 text-sm active:bg-amber-300">
+              Code kopieren
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            Noch keine App? Teilen-Symbol unten in Safari → „Zum Home-Bildschirm“.
+          </p>
+        </div>
+      )}
+      {gastStatus && (
         <div className="bg-sky-500/10 px-4 py-1 text-xs text-sky-200 text-center">{gastStatus}</div>
       )}
       <main className="max-w-md mx-auto px-4 py-4 pb-28">
@@ -2304,8 +2524,8 @@ function App() {
           onGastLaden={(d, name) => { setGast(normalizeData(nurAnzeigedaten(d))); setGastName(name || "Gast"); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
           onGastBeenden={() => { setGast(null); setGastName(""); setGastLive(null); setTab("start"); }}
           gastLive={gastLive}
-          onLiveVerbinden={(daten, name, code, passwort, stand) => {
-            setGast(normalizeData(nurAnzeigedaten(daten))); setGastName(name); setGastLive({ code, passwort, stand });
+          onLiveVerbinden={(daten, name, code, stand) => {
+            setGast(normalizeData(nurAnzeigedaten(daten))); setGastName(name); setGastLive({ code, stand });
             setTab("start"); setEditMotorId(null); setEditAutoId(null);
           }} />}
       </main>
