@@ -190,6 +190,24 @@ async function profilAbrufen(worker, code) {
   return j;
 }
 
+// Als Gast speichern: ohne Schluessel, dafuer nur bei bestehenden Profilen.
+// Der Besitzer bleibt Besitzer - nur die Daten werden ersetzt.
+async function profilGastHochladen(worker, code, name, daten) {
+  let r;
+  try {
+    r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gast: true, name, daten: ohneZugangsdaten(daten) }),
+    });
+  } catch (e) {
+    throw new Error("Speichern: keine Verbindung zum Worker (" + String(e.message || e) + ")");
+  }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.fehler || "Fehler " + r.status);
+  return j;
+}
+
 async function profilLoeschen(worker, code, schluessel) {
   if (!code) return { ok: true };
   const r = await fetch(profilUrl(worker) + "?code=" + encodeURIComponent(code), {
@@ -517,7 +535,7 @@ const normalizeData = (d) => {
   // sonst wuerde sein Profil stillschweigend nicht mehr aktualisiert
   if (!out.freigabe.schluessel) out.freigabe.schluessel = neuerCode(24);
   out.freunde = (Array.isArray(d.freunde) ? d.freunde : [])
-    .map((f) => ({ code: String(f.code || "").toUpperCase(), name: f.name || f.code || "" }))
+    .map((f) => ({ code: String(f.code || "").toUpperCase(), name: f.name || f.code || "", bearbeiten: !!f.bearbeiten }))
     .filter((f) => f.code);
   const f = d.fahrten || [];
   const summe = (feld, id, abDatum) => f
@@ -1516,9 +1534,19 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.7";
+const VERSION = "3.9";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["3.9", [
+    "Änderungen eines Freundes werden jetzt still übernommen – keine Nachfrage mehr.",
+    "Die App schaut beim Start, beim Zurückkehren und jede Minute nach, ob am Profil etwas Neues liegt.",
+    "Was noch nicht hochgeladen ist (z. B. ohne Empfang eingetragen), wird dabei nicht überschrieben.",
+  ]],
+  ["3.8", [
+    "Neu: Hinter jedem Freund steht ein Schalter „Ändern: Ja/Nein“. Bei „Ja“ kannst du in seinem Profil alles eintragen wie im eigenen.",
+    "Deine Eingaben landen sofort bei ihm – die Leiste oben wird grün, solange du ändern darfst.",
+    "Umgekehrt fragt deine App beim Start nach, wenn ein Freund etwas bei dir geändert hat: übernehmen oder deinen Stand behalten.",
+  ]],
   ["3.7", [
     "Fehler behoben: Das Abrufen fremder Profile wurde vom Browser blockiert („Load failed“) – jetzt kommt die Anfrage durch.",
     "Verbindungsfehler sagen jetzt dazu, ob es beim Hochladen oder beim Abrufen klemmt.",
@@ -1902,7 +1930,7 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
   );
 }
 
-function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour, imGast, gastName, onGastLaden, onGastBeenden, onLiveVerbinden, gastLive }) {
+function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId, fullData, onRestore, doBackup, onTour, imGast, gastName, onGastLaden, onGastBeenden, onLiveVerbinden, gastLive, gastSchreiben }) {
   const [showBackup, setShowBackup] = useState(false);
   const [offen, setOffen] = useState("");
   const [gastMsg, setGastMsg] = useState("");
@@ -2099,7 +2127,11 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
         {imGast ? (
           <>
             <p className="text-base font-bold text-sky-300 mb-1">👤 {gastName}</p>
-            <p className="text-sm text-slate-400 mb-4">Nur zum Anschauen – Änderungen sind hier nicht möglich.</p>
+            <p className="text-sm text-slate-400 mb-4">
+              {gastSchreiben
+                ? "Du darfst hier alles eintragen wie im eigenen Profil – deine Eingaben landen sofort bei " + (gastName || "deinem Freund") + "."
+                : "Nur zum Anschauen – Änderungen sind hier nicht möglich."}
+            </p>
             <button onClick={onGastBeenden}
               className="w-full rounded-xl bg-sky-400 text-slate-950 font-bold py-3 active:bg-sky-300">← Zurück zu meinen Daten</button>
           </>
@@ -2165,7 +2197,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                         try {
                           const res = await profilAbrufen(WORKER_STANDARD, f.code);
                           setGastMsg("");
-                          onLiveVerbinden(res.daten, res.name || f.name || f.code, f.code, res.stand);
+                          onLiveVerbinden(res.daten, res.name || f.name || f.code, f.code, res.stand, !!f.bearbeiten);
                         } catch (e) {
                           setGastMsg("❌ " + String(e.message || e));
                           setTimeout(() => setGastMsg(""), 5000);
@@ -2176,7 +2208,19 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
                       <span className="text-2xl leading-none">🔴</span>
                       <span className="flex-1">
                         <span className="block font-bold text-slate-100">{f.name || f.code}</span>
-                        <span className="block text-xs text-slate-400">antippen zum Öffnen</span>
+                        <span className="block text-xs text-slate-400">
+                          {f.bearbeiten ? "antippen – du darfst ändern" : "antippen zum Öffnen"}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => up((d) => ({
+                        freunde: (d.freunde || []).map((x) => (x.code === f.code ? { ...x, bearbeiten: !x.bearbeiten } : x)),
+                      }))}
+                      className={`shrink-0 rounded-xl px-3 py-2 text-center border-2 ${f.bearbeiten ? "border-emerald-400 bg-emerald-400/15" : "border-slate-600"}`}>
+                      <span className="block text-[10px] text-slate-400 leading-tight">Ändern</span>
+                      <span className={`block text-sm font-bold leading-tight ${f.bearbeiten ? "text-emerald-300" : "text-slate-400"}`}>
+                        {f.bearbeiten ? "Ja" : "Nein"}
                       </span>
                     </button>
                     <ConfirmButton label="🗑" confirmLabel="Sicher?"
@@ -2361,11 +2405,42 @@ function App() {
   const [gastLaedt, setGastLaedt] = useState(false);
   const [gastStatus, setGastStatus] = useState("");
   const [linkHinweis, setLinkHinweis] = useState(""); // Code, der ueber einen Link kam
+  const [gastSchreiben, setGastSchreiben] = useState(false); // darf ich dieses Gastprofil aendern?
   const imGast = gast !== null;
   const [saveState, setSaveState] = useState("");
   const saveTimer = useRef(null);
   const loaded = useRef(false);
   const linkErledigt = useRef(false);
+  const ersterLauf = useRef(true);       // beim Start nicht sofort hochladen
+  const gastErsterLauf = useRef(false);  // frisch geoeffnetes Gastprofil nicht gleich zurueckschicken
+  const gastTimer = useRef(null);
+  const datenRef = useRef(null);         // immer der aktuelle Stand, auch im Hintergrund
+  const keinUpload = useRef(false);      // uebernommener Stand muss nicht zurueckgeschickt werden
+  const eigeneAenderung = useRef(false); // etwas Eigenes wartet noch aufs Hochladen
+
+  // Stand vom Worker holen und still uebernehmen - damit zwei Leute an einem Profil arbeiten koennen
+  const holeStandVomWorker = async () => {
+    const d = datenRef.current;
+    if (!d || !d.freigabe || !d.freigabe.aktiv || !d.freigabe.code) return;
+    if (eigeneAenderung.current) return; // erst das Eigene hochladen, dann wieder zuhoeren
+    let gemerkt = "";
+    try { gemerkt = localStorage.getItem("vg8-stand") || ""; } catch { /* egal */ }
+    try {
+      const res = await profilAbrufen(WORKER_STANDARD, d.freigabe.code);
+      if (!res.stand) return;
+      // Erster Start nach der Umstellung: nur merken, nichts anfassen
+      if (!gemerkt || res.stand === gemerkt) {
+        try { localStorage.setItem("vg8-stand", res.stand); } catch { /* egal */ }
+        return;
+      }
+      if (eigeneAenderung.current) return; // waehrend des Abrufs wurde hier getippt
+      try { localStorage.setItem("vg8-stand", res.stand); } catch { /* egal */ }
+      keinUpload.current = true;
+      setData(normalizeData({ ...(res.daten || {}), freigabe: d.freigabe, freunde: d.freunde }));
+      setSaveState("↓ Stand übernommen");
+      setTimeout(() => setSaveState(""), 2500);
+    } catch { /* offline - beim naechsten Mal wieder */ }
+  };
 
   useEffect(() => {
     (async () => {
@@ -2384,6 +2459,8 @@ function App() {
     })();
   }, []);
 
+  useEffect(() => { datenRef.current = data; }, [data]);
+
   // Geteilter Link (…#p=CODE): Profil des Freundes direkt oeffnen und merken
   useEffect(() => {
     if (!data || !loaded.current || linkErledigt.current) return;
@@ -2397,7 +2474,11 @@ function App() {
       setGastLaedt(true); setGastStatus("Profil wird geöffnet …");
       try {
         const res = await profilAbrufen(WORKER_STANDARD, code);
-        setData((d) => ({ ...d, freunde: [...((d && d.freunde) || []).filter((x) => x.code !== code), { code, name: res.name || code }] }));
+        const bekannt = ((data && data.freunde) || []).find((x) => x.code === code);
+        setData((d) => ({ ...d, freunde: [...((d && d.freunde) || []).filter((x) => x.code !== code),
+          { code, name: res.name || code, bearbeiten: !!(bekannt && bekannt.bearbeiten) }] }));
+        gastErsterLauf.current = true;
+        setGastSchreiben(!!(bekannt && bekannt.bearbeiten));
         setGast(normalizeData(nurAnzeigedaten(res.daten)));
         setGastName(res.name || code);
         setGastLive({ code, stand: res.stand });
@@ -2417,6 +2498,12 @@ function App() {
 
   useEffect(() => {
     if (!data || !loaded.current) return;
+    // Beim Start und bei einem uebernommenen Stand nur lokal sichern, nichts hochladen -
+    // sonst wuerde die Arbeit des anderen sofort wieder ueberschrieben
+    const nurLokal = ersterLauf.current || keinUpload.current;
+    ersterLauf.current = false;
+    keinUpload.current = false;
+    if (!nurLokal) eigeneAenderung.current = true;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
@@ -2426,20 +2513,55 @@ function App() {
       } catch {
         setSaveState("Speichern fehlgeschlagen");
       }
+      if (nurLokal) return;
       const fg = data.freigabe;
       if (fg && fg.aktiv && fg.code && fg.schluessel) {
         try {
-          await profilHochladen(WORKER_STANDARD, fg.code, fg.schluessel, fg.name, data);
+          const res = await profilHochladen(WORKER_STANDARD, fg.code, fg.schluessel, fg.name, data);
+          try { localStorage.setItem("vg8-stand", res.stand || ""); } catch { /* egal */ }
+          eigeneAenderung.current = false;
           setSaveState("Freigabe aktualisiert");
           setTimeout(() => setSaveState(""), 1500);
         } catch {
-          // Frueher still verschluckt - dann sah die Freigabe aktiv aus, war es aber nicht
+          // eigeneAenderung bleibt stehen: solange nichts oben ist, wird auch nichts uebernommen
           setSaveState("⚠️ Freigabe nicht hochgeladen");
           setTimeout(() => setSaveState(""), 5000);
         }
+      } else {
+        eigeneAenderung.current = false;
       }
     }, 500);
   }, [data]);
+
+  // Aenderungen an einem fremden Profil zurueckschicken (nur wenn erlaubt)
+  useEffect(() => {
+    if (!gast || !gastSchreiben || !gastLive) return;
+    if (gastErsterLauf.current) { gastErsterLauf.current = false; return; }
+    clearTimeout(gastTimer.current);
+    gastTimer.current = setTimeout(async () => {
+      setSaveState("Speichere bei " + (gastName || "Freund") + " …");
+      try {
+        const res = await profilGastHochladen(WORKER_STANDARD, gastLive.code, gastName, gast);
+        setGastLive((g) => (g ? { ...g, stand: res.stand } : g));
+        setSaveState("Bei " + (gastName || "Freund") + " gespeichert");
+        setTimeout(() => setSaveState(""), 1500);
+      } catch (e) {
+        setSaveState("⚠️ Nicht gespeichert: " + String(e.message || e).slice(0, 40));
+        setTimeout(() => setSaveState(""), 6000);
+      }
+    }, 700);
+  }, [gast]);
+
+  // Beim Start, bei jeder Rueckkehr zur App und dazwischen jede Minute nachsehen,
+  // ob der zweite Mechaniker etwas eingetragen hat
+  useEffect(() => {
+    if (imGast) return;
+    holeStandVomWorker();
+    const beiRueckkehr = () => { if (document.visibilityState === "visible") holeStandVomWorker(); };
+    document.addEventListener("visibilitychange", beiRueckkehr);
+    const takt = setInterval(beiRueckkehr, 60000);
+    return () => { document.removeEventListener("visibilitychange", beiRueckkehr); clearInterval(takt); };
+  }, [imGast]);
 
   if (!data) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">Lade Daten…</div>;
@@ -2449,7 +2571,12 @@ function App() {
   const { autos, motoren, fahrten, settings } = anzeige;
   // up akzeptiert ein Objekt ODER eine Funktion (d) => patch – immer auf aktuellem Stand
   const up = (patch) => {
-    if (imGast) return; // Gastprofil ist nur lesbar
+    if (imGast) {
+      // Gastprofil nur aendern, wenn der Schalter beim Freund auf "Ja" steht
+      if (!gastSchreiben) return;
+      setGast((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) }));
+      return;
+    }
     setData((d) => ({ ...d, ...(typeof patch === "function" ? patch(d) : patch) }));
   };
 
@@ -2489,9 +2616,9 @@ function App() {
         try { localStorage.setItem("vg8-version", VERSION); } catch { /* egal */ }
       }} />}
       {imGast && (
-        <div className="bg-sky-500/15 border-b border-sky-400/40 px-4 py-2 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-sky-200">
-            {gastLive ? "🔴 Live" : "👤 Gast"}: {gastName || "Gast"} · nur lesen
+        <div className={`${gastSchreiben ? "bg-emerald-400/15 border-emerald-400/50" : "bg-sky-500/15 border-sky-400/40"} border-b px-4 py-2 flex items-center justify-between gap-2`}>
+          <span className={`text-xs font-bold ${gastSchreiben ? "text-emerald-200" : "text-sky-200"}`}>
+            {gastLive ? "🔴 Live" : "👤 Gast"}: {gastName || "Gast"} · {gastSchreiben ? "du darfst ändern" : "nur lesen"}
             {gastLive && gastLive.stand ? " · Stand " + fmtDate(String(gastLive.stand).slice(0, 10)) + " " + String(gastLive.stand).slice(11, 16) : ""}
           </span>
           <div className="flex gap-2 shrink-0">
@@ -2512,7 +2639,7 @@ function App() {
                 className="text-xs font-bold rounded-xl border border-sky-400 text-sky-200 px-3 py-1.5 active:bg-sky-400/20 disabled:opacity-40">
                 {gastLaedt ? "…" : "↻"}</button>
             )}
-            <button onClick={() => { setGast(null); setGastName(""); setGastLive(null); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
+            <button onClick={() => { clearTimeout(gastTimer.current); setGast(null); setGastName(""); setGastLive(null); setGastSchreiben(false); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
               className="text-xs font-bold rounded-xl bg-sky-400 text-slate-950 px-3 py-1.5 active:bg-sky-300">Zurück</button>
           </div>
         </div>
@@ -2566,7 +2693,10 @@ function App() {
           onGastLaden={(d, name) => { setGast(normalizeData(nurAnzeigedaten(d))); setGastName(name || "Gast"); setTab("start"); setEditMotorId(null); setEditAutoId(null); }}
           onGastBeenden={() => { setGast(null); setGastName(""); setGastLive(null); setTab("start"); }}
           gastLive={gastLive}
-          onLiveVerbinden={(daten, name, code, stand) => {
+          gastSchreiben={gastSchreiben}
+          onLiveVerbinden={(daten, name, code, stand, darfAendern) => {
+            gastErsterLauf.current = true;
+            setGastSchreiben(!!darfAendern);
             setGast(normalizeData(nurAnzeigedaten(daten))); setGastName(name); setGastLive({ code, stand });
             setTab("start"); setEditMotorId(null); setEditAutoId(null);
           }} />}
