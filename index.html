@@ -997,7 +997,7 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
               className="flex-1 rounded-xl border border-slate-600 py-2 text-sm font-semibold text-slate-200 active:bg-slate-800">+{String(v).replace(".", ",")} L</button>
           ))}
         </div>
-        <Field label="Notiz (optional)"><input className={inputCls} value={notiz} onChange={(e) => setNotiz(e.target.value)} /></Field>
+        <Field label="Notiz (optional)"><input className={`${inputCls} font-bold text-amber-200`} value={notiz} onChange={(e) => setNotiz(e.target.value)} /></Field>
         <button onClick={add} disabled={parseNum(liter) <= 0}
           className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 disabled:opacity-40 active:bg-amber-300">Fahrt speichern</button>
       </Card>
@@ -1544,9 +1544,12 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "4.1";
+const VERSION = "4.2";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["4.2", [
+    "Beim Fahrt-Eintragen ist jetzt das Eingetragene gelb – Datum, Auto, Motor, Liter und Notiz. Die Beschriftungen bleiben grau.",
+  ]],
   ["4.1", [
     "Größere Symbole in der unteren Leiste, „Einstellungen“ steht jetzt zweizeilig.",
     "Der Erklärtext auf der Notizseite ist raus.",
@@ -1996,11 +1999,11 @@ function NotizenScreen({ notizen, up }) {
           </button>
         ) : (
           <div className="rounded-xl border-2 border-amber-400/60 bg-slate-950/60 p-3">
-            <Field label="Überschrift" betont>
+            <Field label="Überschrift">
               <input className={inputCls} placeholder="z. B. Idee Reso-Halter" value={titel}
                 onChange={(e) => setTitel(e.target.value)} />
             </Field>
-            <Field label="Notiz" betont>
+            <Field label="Notiz">
               <textarea rows={6} className={`${inputCls} leading-relaxed`} placeholder="Was willst du dir merken?"
                 value={text} onChange={(e) => setText(e.target.value)} />
             </Field>
