@@ -521,6 +521,7 @@ const seedData = () => ({
   pruef: { kerze: 1, kruemmer: 2 },
   freigabe: { aktiv: false, code: "", schluessel: "", name: "" },
   freunde: [],
+  notizen: [],
 });
 
 const KZ_DEFAULT = () => ({ reset: "2020-01-01", start: 0, note: "", checkedAt: 0 });
@@ -537,6 +538,15 @@ const normalizeData = (d) => {
   out.freunde = (Array.isArray(d.freunde) ? d.freunde : [])
     .map((f) => ({ code: String(f.code || "").toUpperCase(), name: f.name || f.code || "", bearbeiten: !!f.bearbeiten }))
     .filter((f) => f.code);
+  out.notizen = (Array.isArray(d.notizen) ? d.notizen : []).map((n) => ({
+    id: n.id || uid(),
+    titel: n.titel || "",
+    text: n.text || "",
+    wichtig: !!n.wichtig,
+    datum: n.datum || today(),
+    ts: n.ts || Date.now(),
+    geaendert: n.geaendert || 0,
+  }));
   const f = d.fahrten || [];
   const summe = (feld, id, abDatum) => f
     .filter((x) => x[feld] === id && (!abDatum || x.datum >= abDatum))
@@ -621,10 +631,10 @@ function Card({ children, className = "" }) {
   return <div className={`bg-slate-900 rounded-2xl border-2 border-slate-600 p-4 overflow-hidden ${className}`}>{children}</div>;
 }
 
-function Field({ label, children }) {
+function Field({ label, children, betont }) {
   return (
     <label className="block mb-3">
-      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</span>
+      <span className={`block text-xs uppercase tracking-wide mb-1 ${betont ? "text-amber-300 font-bold" : "text-slate-400 font-semibold"}`}>{label}</span>
       {children}
     </label>
   );
@@ -968,18 +978,18 @@ function FahrtScreen({ autos, motoren, fahrten, up, setTab, activeAutoId }) {
       <Card>
         <h2 className="text-lg font-extrabold text-slate-100 mb-3">Fahrt eintragen</h2>
         <Field label="Datum"><input type="date" className={inputCls} value={datum} onChange={(e) => setDatum(e.target.value)} /></Field>
-        <Field label="Auto">
-          <select className={inputCls} value={autoId} onChange={(e) => { setAutoId(e.target.value); const a2 = autos.find((a) => a.id === e.target.value); if (a2?.motorId) setMotorId(a2.motorId); }}>
+        <Field label="Auto" betont>
+          <select className={`${inputCls} font-bold text-amber-200`} value={autoId} onChange={(e) => { setAutoId(e.target.value); const a2 = autos.find((a) => a.id === e.target.value); if (a2?.motorId) setMotorId(a2.motorId); }}>
             {autos.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </Field>
-        <Field label="Motor">
-          <select className={inputCls} value={motorId} onChange={(e) => setMotorId(e.target.value)}>
+        <Field label="Motor" betont>
+          <select className={`${inputCls} font-bold text-amber-200`} value={motorId} onChange={(e) => setMotorId(e.target.value)}>
             {motoren.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </Field>
-        <Field label="Laufleistung [L]">
-          <input inputMode="decimal" placeholder="z. B. 0,5" className={inputCls} value={liter} onChange={(e) => setLiter(e.target.value)} />
+        <Field label="Laufleistung [L]" betont>
+          <input inputMode="decimal" placeholder="z. B. 0,5" className={`${inputCls} font-bold text-amber-200`} value={liter} onChange={(e) => setLiter(e.target.value)} />
         </Field>
         <div className="flex gap-2 mb-3">
           {[0.25, 0.5, 1].map((v) => (
@@ -1534,9 +1544,19 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "3.9";
+const VERSION = "4.1";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["4.1", [
+    "Größere Symbole in der unteren Leiste, „Einstellungen“ steht jetzt zweizeilig.",
+    "Der Erklärtext auf der Notizseite ist raus.",
+  ]],
+  ["4.0", [
+    "Neuer Reiter „Notizen“ – für Ideen, Umbauten und alles, was man sich sonst auf einen Zettel schreibt.",
+    "Wichtige Notizen mit dem Stern markieren, dann stehen sie oben.",
+    "Beim Fahrt-Eintragen sind Auto, Motor und Laufleistung jetzt gelb hervorgehoben.",
+    "„Mehr“ heißt jetzt „Einstellungen“.",
+  ]],
   ["3.9", [
     "Änderungen eines Freundes werden jetzt still übernommen – keine Nachfrage mehr.",
     "Die App schaut beim Start, beim Zurückkehren und jede Minute nach, ob am Profil etwas Neues liegt.",
@@ -1593,7 +1613,7 @@ const NEUERUNGEN = [
   ]],
   ["2.8", [
     "Neu: Live-Profile! Gib deinen Freunden Code und Passwort – sie sehen dann immer deinen aktuellen Stand.",
-    "Unter „Mehr“ → „Profile“ kannst du dein Profil freigeben oder das eines Freundes live öffnen.",
+    "Unter „Einstellungen“ → „Profile“ kannst du dein Profil freigeben oder das eines Freundes live öffnen.",
     "Bei aktiver Freigabe wird dein Stand nach jeder Änderung automatisch hochgeladen.",
     "Gast-Ansichten bleiben schreibgeschützt – Änderungen sind dort nicht möglich.",
   ]],
@@ -1680,7 +1700,7 @@ const TOUR = [
   { icon: "📜", titel: "7. Aus der Historie lernen", text: "Jedes getauschte Teil wird mit Hersteller und gefahrenen Litern gespeichert. So siehst du mit der Zeit, welche Lager am längsten halten.", demo: "historie" },
   { icon: "🔗", titel: "8. Speedhive verknüpfen", text: "Einmalig pro Auto: Speedhive-App öffnen, eine Session teilen, Link kopieren – dann unter „Autos“ auf „Jetzt verknüpfen“ und einfügen. Danach nie wieder nötig.", demo: "verknuepfen" },
   { icon: "🏆", titel: "9. Motoren vergleichen", text: "Bei „Motoren“ holst du mit einem Tipp die schnellste Runde des Tages oder der letzten Session. Temperatur und Ort kommen automatisch – du wählst nur den Grip.", demo: "auswertung" },
-  { icon: "💾", titel: "10. Daten sichern", text: "Unter „Mehr“ regelmäßig auf „Als Datei sichern“ tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
+  { icon: "💾", titel: "10. Daten sichern", text: "Unter „Einstellungen“ regelmäßig auf „Als Datei sichern“ tippen. Die App erinnert dich automatisch daran.", demo: "backup" },
 ];
 
 function TourDemo({ art }) {
@@ -1762,7 +1782,7 @@ function TourDemo({ art }) {
       </div>
     );
   }
-  const tabs = [["📊", "Start"], ["⛽", "Fahrt"], ["🚗", "Autos"], ["🔧", "Motoren"], ["🏁", "Rang"], ["⚙️", "Mehr"]];
+  const tabs = [["📊", "Start"], ["⛽", "Fahrt"], ["🚗", "Autos"], ["🔧", "Motoren"], ["🏁", "Rang"], ["📝", "Notiz"], ["⚙️", "Einst."]];
   const aktiv = art === "auto" ? "Autos" : art === "motor" ? "Motoren" : "Start";
   return (
     <div className={box + " flex justify-around"}>
@@ -1788,7 +1808,7 @@ function TourScreen({ onClose }) {
   const s = TOUR[i];
   return (
     <div className="space-y-4">
-      <button onClick={onClose} className="text-amber-300 font-semibold text-sm">← Zurück zu Mehr</button>
+      <button onClick={onClose} className="text-amber-300 font-semibold text-sm">← Zurück zu den Einstellungen</button>
       <Card>
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-slate-400 tabular-nums">Schritt {i + 1} von {TOUR.length}</span>
@@ -1926,6 +1946,114 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
       })}
       <button onClick={() => { const id = uid(); up((d) => ({ activeAutoId: d.activeAutoId || id, autos: [...d.autos, { id, name: "Neues Auto", motorId: (d.motoren[0] || {}).id || "", gesamt: 0, startAuto: 0, fv: { reset: today(), start: 0, stand: 0 }, fg1: { reset: today(), start: 0, stand: 0 } }] })); setEditAutoId(id); }}
         className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3">+ Auto hinzufügen</button>
+    </div>
+  );
+}
+
+function NotizenScreen({ notizen, up }) {
+  const [offen, setOffen] = useState(false);
+  const [bearbeite, setBearbeite] = useState(null);
+  const [titel, setTitel] = useState("");
+  const [text, setText] = useState("");
+
+  const leeren = () => { setTitel(""); setText(""); setBearbeite(null); setOffen(false); };
+
+  const speichern = () => {
+    const t = titel.trim(), inhalt = text.trim();
+    if (!t && !inhalt) return;
+    if (bearbeite) {
+      up((d) => ({
+        notizen: (d.notizen || []).map((n) =>
+          n.id === bearbeite ? { ...n, titel: t, text: inhalt, geaendert: Date.now() } : n),
+      }));
+    } else {
+      up((d) => ({
+        notizen: [...(d.notizen || []), { id: uid(), titel: t, text: inhalt, wichtig: false, datum: today(), ts: Date.now(), geaendert: 0 }],
+      }));
+    }
+    leeren();
+  };
+
+  const wichtigUm = (id) => up((d) => ({
+    notizen: (d.notizen || []).map((n) => (n.id === id ? { ...n, wichtig: !n.wichtig } : n)),
+  }));
+
+  // Wichtiges oben, sonst das Neueste zuerst
+  const liste = [...(notizen || [])].sort((a, b) =>
+    (b.wichtig ? 1 : 0) - (a.wichtig ? 1 : 0) || (b.ts || 0) - (a.ts || 0));
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-lg font-extrabold text-slate-100">Notizen</h2>
+          <span className="text-xs text-slate-400">{liste.length} {liste.length === 1 ? "Eintrag" : "Einträge"}</span>
+        </div>
+        {!offen ? (
+          <button onClick={() => { setBearbeite(null); setTitel(""); setText(""); setOffen(true); }}
+            className="w-full rounded-xl bg-amber-400 text-slate-950 font-bold py-3 active:bg-amber-300">
+            ＋ Neue Notiz
+          </button>
+        ) : (
+          <div className="rounded-xl border-2 border-amber-400/60 bg-slate-950/60 p-3">
+            <Field label="Überschrift" betont>
+              <input className={inputCls} placeholder="z. B. Idee Reso-Halter" value={titel}
+                onChange={(e) => setTitel(e.target.value)} />
+            </Field>
+            <Field label="Notiz" betont>
+              <textarea rows={6} className={`${inputCls} leading-relaxed`} placeholder="Was willst du dir merken?"
+                value={text} onChange={(e) => setText(e.target.value)} />
+            </Field>
+            <div className="flex gap-2">
+              <button onClick={speichern} disabled={!titel.trim() && !text.trim()}
+                className="flex-1 rounded-xl bg-amber-400 text-slate-950 font-bold py-2.5 text-sm active:bg-amber-300 disabled:opacity-40">
+                {bearbeite ? "Änderung speichern" : "Notiz speichern"}
+              </button>
+              <button onClick={leeren}
+                className="flex-1 rounded-xl border border-slate-600 text-slate-300 font-semibold py-2.5 text-sm active:bg-slate-800">
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {liste.length === 0 && !offen && (
+        <Card className="text-sm text-slate-400">
+          Noch keine Notiz. Der erste Gedanke, der dir an der Strecke kommt, gehört hier rein.
+        </Card>
+      )}
+
+      {liste.map((n) => (
+        <Card key={n.id} className={n.wichtig ? "border-amber-400/70" : ""}>
+          <div className="flex items-start gap-3">
+            <button onClick={() => wichtigUm(n.id)} className="text-xl leading-none shrink-0 pt-0.5">
+              {n.wichtig ? "⭐️" : "☆"}
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className={`font-bold break-words ${n.wichtig ? "text-amber-300" : "text-slate-100"}`}>
+                {n.titel || "Ohne Überschrift"}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {fmtDate(n.datum)}{n.geaendert ? " · bearbeitet" : ""}
+              </p>
+            </div>
+          </div>
+          {n.text && <p className="text-sm text-slate-300 whitespace-pre-wrap break-words mt-2">{n.text}</p>}
+          <div className="flex gap-2 mt-3">
+            <button onClick={() => {
+                setBearbeite(n.id); setTitel(n.titel || ""); setText(n.text || ""); setOffen(true);
+                try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* egal */ }
+              }}
+              className="flex-1 rounded-xl border border-slate-600 text-slate-300 text-sm font-semibold py-2 active:bg-slate-800">
+              ✎ Bearbeiten
+            </button>
+            <ConfirmButton label="🗑" confirmLabel="Sicher?"
+              onConfirm={() => up((d) => ({ notizen: (d.notizen || []).filter((x) => x.id !== n.id) }))}
+              className="shrink-0 rounded-xl border border-red-500/50 text-red-400 text-sm font-bold px-4 py-2" />
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -2601,7 +2729,7 @@ function App() {
 
   const tabs = [
     ["start", "Start", "📊"], ["fahrt", "Fahrt", "⛽"], ["autos", "Autos", "🚗"], ["motoren", "Motoren", "🔧"],
-    ["rang", "Rangliste", "🏁"], ["mehr", "Mehr", "⚙️"],
+    ["rang", "Rangliste", "🏁"], ["notizen", "Notizen", "📝"], ["mehr", "Einstel-\nlungen", "⚙️"],
   ];
 
   return (
@@ -2653,7 +2781,7 @@ function App() {
           </div>
           <p className="text-xs text-slate-300 mt-1 mb-2">
             Dieses Fenster ist nur ein Besuch. Code kopieren und in deiner Nitro-Service-App einmal
-            unter „Mehr → Profile → Freund hinzufügen“ einfügen – danach ist {gastName || "das Profil"} dauerhaft dort.
+            unter „Einstellungen → Profile → Freund hinzufügen“ einfügen – danach ist {gastName || "das Profil"} dauerhaft dort.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-extrabold tracking-widest text-lg text-amber-300">{linkHinweis}</span>
@@ -2686,6 +2814,7 @@ function App() {
         {!tourOffen && tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
           activeMotorId={(autos.find((a) => a.id === anzeige.activeAutoId) || autos[0])?.motorId || null} autos={autos} />}
         {!tourOffen && tab === "rang" && <RanglisteScreen motoren={motoren} />}
+        {!tourOffen && tab === "notizen" && <NotizenScreen notizen={anzeige.notizen || []} up={up} />}
         {!tourOffen && tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={anzeige.activeAutoId}
           fullData={anzeige} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
           onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)}
@@ -2704,8 +2833,10 @@ function App() {
       <nav className="fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-700/60 flex justify-around" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map(([key, label, icon]) => (
           <button key={key} onClick={() => { setTab(key); if (key !== "motoren") setEditMotorId(null); if (key !== "autos") setEditAutoId(null); }}
-            className={`flex flex-col items-center py-2 px-2 text-xs font-semibold ${tab === key ? "text-amber-300" : "text-slate-400"}`}>
-            <span className="text-xl leading-none mb-0.5">{icon}</span>{label}
+            className={`flex-1 min-w-0 flex flex-col items-center pt-1 pb-1.5 px-0.5 ${tab === key ? "text-amber-300" : "text-slate-400"}`}>
+            <span className="text-[26px] leading-none mb-1">{icon}</span>
+            <span className="w-full text-center text-[9px] font-semibold tracking-tight leading-[1.05] whitespace-pre-line"
+              style={{ minHeight: "1.9em" }}>{label}</span>
           </button>
         ))}
       </nav>
