@@ -522,6 +522,7 @@ const seedData = () => ({
   freigabe: { aktiv: false, code: "", schluessel: "", name: "" },
   freunde: [],
   notizen: [],
+  ansicht: { notizen: false },
 });
 
 const KZ_DEFAULT = () => ({ reset: "2020-01-01", start: 0, note: "", checkedAt: 0 });
@@ -538,6 +539,8 @@ const normalizeData = (d) => {
   out.freunde = (Array.isArray(d.freunde) ? d.freunde : [])
     .map((f) => ({ code: String(f.code || "").toUpperCase(), name: f.name || f.code || "", bearbeiten: !!f.bearbeiten }))
     .filter((f) => f.code);
+  // Standard ist aus - wer den Reiter will, schaltet ihn in den Einstellungen ein
+  out.ansicht = { notizen: (d.ansicht || {}).notizen === true };
   out.notizen = (Array.isArray(d.notizen) ? d.notizen : []).map((n) => ({
     id: n.id || uid(),
     titel: n.titel || "",
@@ -1307,7 +1310,10 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
   return (
     <div className="space-y-3">
       {motoren.length === 0 && <Card className="text-sm text-slate-400">Noch kein Motor – lege unten deinen ersten an.</Card>}
-      {[...motoren].sort((a, b) => (b.favorit ? 1 : 0) - (a.favorit ? 1 : 0)).map((m) => {
+      {[...motoren].sort((a, b) =>
+        // erst der Motor, der gerade im aktiven Auto steckt, dann die Favoriten
+        (b.id === activeMotorId ? 1 : 0) - (a.id === activeMotorId ? 1 : 0) ||
+        (b.favorit ? 1 : 0) - (a.favorit ? 1 : 0)).map((m) => {
         const s = motorStands(m);
         const worst = [statusOf(s.hl, settings.hl), statusOf(s.fl, settings.fl), statusOf(s.pl, settings.pl), statusOf(s.kz, settings.kz)]
           .sort((a, b) => a.rest - b.rest)[0];
@@ -1320,7 +1326,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
             <button onClick={() => setEditMotorId(m.id)} className="flex-1 text-left">
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-slate-100">{m.name}</span>
-                {isActive && <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Aktiv</span>}
+                {isActive && <span className="text-sm font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300">Aktiv</span>}
               </div>
               <div className="text-base font-extrabold text-amber-300 tabular-nums">{fmt(s.gesamt)} L</div>
             </button>
@@ -1548,9 +1554,14 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "4.3";
+const VERSION = "4.4";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["4.4", [
+    "Der Motor im aktiven Auto steht in der Liste jetzt immer ganz oben.",
+    "Die Plakette „Aktiv“ ist größer – bei Motoren und bei Autos.",
+    "Neu unter Einstellungen → Anzeige: Dort schaltest du den Reiter „Notizen“ ein – ab Werk ist er aus.",
+  ]],
   ["4.3", [
     "Jetzt wirklich: Beim Fahrt-Eintragen steht das Eingetragene gelb, die Beschriftungen sind grau.",
   ]],
@@ -1946,7 +1957,7 @@ function AutosScreen({ autos, motoren, fahrten, settings, up, activeAutoId, edit
             <button onClick={() => setEditAutoId(a.id)} className="flex-1 text-left">
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-slate-100">{a.name}</span>
-                {isActive && <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">Aktiv</span>}
+                {isActive && <span className="text-sm font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300">Aktiv</span>}
               </div>
               <div className="text-base font-extrabold text-amber-300 tabular-nums">{fmt(a.gesamt || 0)} L</div>
               <div className="text-xs text-slate-400">Motor: {motorName}</div>
@@ -2077,6 +2088,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
   const [hinzufuegenOffen, setHinzufuegenOffen] = useState(false);
   const [dateiOffen, setDateiOffen] = useState(false);
   const fg = fullData.freigabe || {};
+  const zeigtNotizen = (fullData.ansicht || {}).notizen === true;
 
   // Freigabe an- oder ausschalten. Code und Schluessel entstehen beim ersten Mal von selbst.
   const setzeFreigabe = async (an) => {
@@ -2243,6 +2255,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
         ["maxwerte", "🚦", "Wechselintervalle", "Wann Bauteile fällig werden"],
         ["sicht", "🔍", "Sichtprüfungen", "Kerze und Krümmerdichtung"],
         ["sicherung", "💾", "Datensicherung", "Sichern und wiederherstellen"],
+        ["ansicht", "👁", "Anzeige", zeigtNotizen ? "Reiter „Notizen“ ist an" : "Reiter „Notizen“ ist aus"],
         ["tour", "🎬", "Einführung", "Kurze Tour durch alle Funktionen"],
       ];
 
@@ -2444,6 +2457,22 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
             </div>
           </div>
         ))}
+              </>)}
+              {key === "ansicht" && (<>
+                <p className="font-bold text-slate-100 mb-1">Reiter „Notizen“ unten anzeigen</p>
+                <p className="text-xs text-slate-400 mb-3">
+                  Mit sieben Reitern wird die Leiste auf kleinen Handys eng. Ohne Notizen bleibt mehr Platz –
+                  deine Notizen bleiben dabei gespeichert.
+                </p>
+                <div className="flex gap-2">
+                  {[["nein", false, "Nein"], ["ja", true, "Ja"]].map(([kennung, wert, beschriftung]) => (
+                    <button key={kennung}
+                      onClick={() => up((d) => ({ ansicht: { ...(d.ansicht || {}), notizen: wert } }))}
+                      className={`flex-1 rounded-xl py-2.5 text-sm font-bold ${zeigtNotizen === wert ? "bg-amber-400 text-slate-950" : "border border-slate-600 text-slate-300 active:bg-slate-800"}`}>
+                      {beschriftung}
+                    </button>
+                  ))}
+                </div>
               </>)}
               {key === "maxwerte" && (<>
         {[["fv", "Freilauf Vorne"], ["fg1", "Freilauf Gang 1"], ["hl", "Hauptlager"], ["fl", "Frontlager"], ["pl", "Pleuel"], ["kz", "Kerze"]].map(([key, label]) => (
@@ -2737,10 +2766,12 @@ function App() {
     }
   };
 
+  // Der Notizen-Reiter lässt sich in den Einstellungen abschalten
+  const zeigeNotizen = (data.ansicht || {}).notizen === true;
   const tabs = [
     ["start", "Start", "📊"], ["fahrt", "Fahrt", "⛽"], ["autos", "Autos", "🚗"], ["motoren", "Motoren", "🔧"],
     ["rang", "Rangliste", "🏁"], ["notizen", "Notizen", "📝"], ["mehr", "Einstel-\nlungen", "⚙️"],
-  ];
+  ].filter(([key]) => key !== "notizen" || zeigeNotizen);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "ui-sans-serif, -apple-system, system-ui, sans-serif", colorScheme: "dark" }}>
@@ -2824,7 +2855,7 @@ function App() {
         {!tourOffen && tab === "motoren" && <MotorenScreen motoren={motoren} fahrten={fahrten} settings={settings} up={up} editMotorId={editMotorId} setEditMotorId={setEditMotorId}
           activeMotorId={(autos.find((a) => a.id === anzeige.activeAutoId) || autos[0])?.motorId || null} autos={autos} />}
         {!tourOffen && tab === "rang" && <RanglisteScreen motoren={motoren} />}
-        {!tourOffen && tab === "notizen" && <NotizenScreen notizen={anzeige.notizen || []} up={up} />}
+        {!tourOffen && tab === "notizen" && zeigeNotizen && <NotizenScreen notizen={anzeige.notizen || []} up={up} />}
         {!tourOffen && tab === "mehr" && <SettingsScreen autos={autos} motoren={motoren} settings={settings} up={up} activeAutoId={anzeige.activeAutoId}
           fullData={anzeige} onRestore={(d) => setData(normalizeData(d))} doBackup={doBackup}
           onResetAll={() => setData(seedData())} onTour={() => setTourOffen(true)}
