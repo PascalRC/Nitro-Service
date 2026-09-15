@@ -780,7 +780,7 @@ function PartEditor({ title, part, onChange, withNote, stand, cfg, pruefInterval
       </div>
       {withNote && (
         <label className="block text-xs text-slate-400 mt-2">Notiz (z. B. Hersteller)
-          <input className={`${inputCls} mt-1`} placeholder="z. B. O.S Lager" value={part.note || ""}
+          <input className={`${inputCls} mt-1`} placeholder="z. B. Keramik, Stahl, Bauart" value={part.note || ""}
             onChange={(e) => onChange({ ...part, note: e.target.value })} />
         </label>
       )}
@@ -1184,7 +1184,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
           </div>
           {montiertesAuto ? (
             <Field label="Ausweich-Ort (falls kein Standortzugriff möglich)">
-              <input placeholder="z. B. Ettlingen" className={inputCls} value={montiertesAuto.ort || ""}
+              <input placeholder="z. B. Heimstrecke" className={inputCls} value={montiertesAuto.ort || ""}
                 onChange={(e) => up((d) => ({ autos: d.autos.map((a) => a.id === montiertesAuto.id ? { ...a, ort: e.target.value } : a) }))} />
             </Field>
           ) : (
@@ -1234,7 +1234,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
               <p className="text-2xl font-extrabold text-amber-300 tabular-nums mb-1">{fmtLap(pendingLap.zeit)}</p>
               <p className="text-sm text-slate-200 mb-3">{fmtDate(pendingLap.datum)} {pendingLap.uhrzeit} · {pendingLap.temperatur !== null && pendingLap.temperatur !== undefined ? Math.round(pendingLap.temperatur) + "°C" : "Temp. unbekannt"}</p>
               <label className="block text-xs text-slate-400 mb-2">Strecke / Ort (änderbar)
-                <input className={`${inputCls} mt-1`} placeholder="z. B. Ettlingen" value={pendingLap.ort || ""}
+                <input className={`${inputCls} mt-1`} placeholder="z. B. Heimstrecke" value={pendingLap.ort || ""}
                   onChange={(e) => setPendingLap({ ...pendingLap, ort: e.target.value })} />
               </label>
               <label className="block text-xs text-slate-400 mb-3">Notiz (optional)
@@ -1271,7 +1271,7 @@ function MotorenScreen({ motoren, fahrten, settings, up, editMotorId, setEditMot
               {editLapId === r.id && (
                 <div className="mt-2 border border-slate-700/60 rounded-xl p-3">
                   <label className="block text-xs text-slate-400 mb-2">Strecke / Ort
-                    <input className={`${inputCls} mt-1`} placeholder="z. B. Ettlingen" value={r.ort || ""}
+                    <input className={`${inputCls} mt-1`} placeholder="z. B. Heimstrecke" value={r.ort || ""}
                       onChange={(e) => setMotor({ rundenzeiten: rundenzeiten.map((x) => x.id === r.id ? { ...x, ort: e.target.value } : x) })} />
                   </label>
                   <label className="block text-xs text-slate-400 mb-2">Notiz
@@ -1554,9 +1554,12 @@ function RanglisteScreen({ motoren }) {
   );
 }
 
-const VERSION = "4.4";
+const VERSION = "4.5";
 const NEUERUNGEN_AKTIV = false; // auf true stellen, sobald Updates wieder angekuendigt werden sollen
 const NEUERUNGEN = [
+  ["4.5", [
+    "In den Beispielen stehen keine Namen und keine Hersteller mehr – weder in leeren Feldern noch in der Einführung.",
+  ]],
   ["4.4", [
     "Der Motor im aktiven Auto steht in der Liste jetzt immer ganz oben.",
     "Die Plakette „Aktiv“ ist größer – bei Motoren und bei Autos.",
@@ -1621,7 +1624,7 @@ const NEUERUNGEN = [
     "Profile-Bereich komplett aufgeräumt: Deine Freigabe steht jetzt immer oben mit klarem Status (grün = aktiv).",
     "Der Reiter „Profile“ zeigt direkt an, ob deine Freigabe läuft, ohne ihn zu öffnen.",
     "Favorisierte Motoren stehen jetzt oben in der Motoren-Liste.",
-    "Update-Meldungen sind vorerst pausiert, bis Pascal sie wieder aktiviert.",
+    "Update-Meldungen sind vorerst pausiert.",
   ]],
   ["3.0", [
     "Wichtiger Fehler behoben: Passwortfelder bei Live-Profilen konnten vom iPhone automatisch großgeschrieben werden – das führte dazu, dass gestern gespeicherte Passwörter heute nicht mehr passten.",
@@ -1729,9 +1732,9 @@ function TourDemo({ art }) {
   if (art === "balken") {
     return (
       <div className={box}>
-        <TankBar name="Hauptlager" note="O.S Lager" stand={1.5} cfg={{ max: 5, gelb: 1 }} />
-        <TankBar name="Frontlager" note="SKF ZZ" stand={4.2} cfg={{ max: 5, gelb: 1 }} />
-        <TankBar name="Kerze" note="RP7" stand={4.6} cfg={{ max: 4, gelb: 1 }} />
+        <TankBar name="Hauptlager" note="Keramik" stand={1.5} cfg={{ max: 5, gelb: 1 }} />
+        <TankBar name="Frontlager" note="Stahl" stand={4.2} cfg={{ max: 5, gelb: 1 }} />
+        <TankBar name="Kerze" note="kalt" stand={4.6} cfg={{ max: 4, gelb: 1 }} />
       </div>
     );
   }
@@ -1769,8 +1772,8 @@ function TourDemo({ art }) {
     return (
       <div className={box}>
         <p className="text-xs font-bold text-slate-300 mb-1">📜 Historie (2)</p>
-        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2">O.S Lager – 4,8 L · ausgebaut 19.07.2026</p>
-        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2 mt-1">SKF ZZ – 3,2 L · ausgebaut 05.07.2026</p>
+        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2">Keramik – 4,8 L · ausgebaut 19.07.2026</p>
+        <p className="text-xs text-slate-400 border-l-2 border-slate-700 pl-2 mt-1">Stahl – 3,2 L · ausgebaut 05.07.2026</p>
       </div>
     );
   }
@@ -1778,7 +1781,7 @@ function TourDemo({ art }) {
     return (
       <div className={box}>
         <p className="text-lg font-extrabold text-amber-300 tabular-nums mb-1">🏆 13,760s</p>
-        <p className="text-xs text-slate-400 mb-2">19.07.2026 14:30 · Ettlingen · 24°C · Grip: Hoch</p>
+        <p className="text-xs text-slate-400 mb-2">19.07.2026 14:30 · Heimstrecke · 24°C · Grip: Hoch</p>
         <div className="flex gap-2">
           {["Hoch", "Mittel", "Wenig"].map((g) => (
             <span key={g} className="flex-1 text-center text-[11px] rounded-lg bg-amber-400 text-slate-950 font-bold py-1.5">{g}</span>
@@ -1790,7 +1793,7 @@ function TourDemo({ art }) {
   if (art === "verknuepfen") {
     return (
       <div className={box}>
-        <p className="text-sm font-bold text-emerald-300 mb-2">✓ Verknüpft (Nr. 8017814816)</p>
+        <p className="text-sm font-bold text-emerald-300 mb-2">✓ Verknüpft (Nr. 1234567)</p>
         <span className="block text-center text-xs font-bold rounded-lg border border-amber-400 text-amber-300 py-2">Verknüpfung ändern</span>
       </div>
     );
@@ -2299,7 +2302,7 @@ function SettingsScreen({ autos, motoren, settings, up, onResetAll, activeAutoId
               </div>
 
               <label className="block text-xs text-slate-400 mb-3">Dein Name – so tauchst du bei deinen Freunden auf
-                <input className={`${inputCls} mt-1`} placeholder="z. B. Pascal" value={fg.name || ""}
+                <input className={`${inputCls} mt-1`} placeholder="z. B. dein Vorname" value={fg.name || ""}
                   onChange={(e) => up((d) => ({ freigabe: { ...(d.freigabe || {}), name: e.target.value } }))} />
               </label>
 
